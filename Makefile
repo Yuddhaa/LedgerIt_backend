@@ -29,7 +29,7 @@ logs:
 build:
 	@echo "Building Go binary..."
 	@mkdir -p bin
-	@go build -o ./bin/server ./cmd/api/main.go
+	@go build -o ./bin/server ./cmd/main/main.go
 
 # Install the 'air' hot-reload tool
 install-air:

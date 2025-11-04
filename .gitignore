@@ -4,3 +4,5 @@
 
 # .env file (for local secrets)
 .env
+
+log.log

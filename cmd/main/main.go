@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
@@ -24,7 +25,21 @@ type config struct {
 }
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	// Open the log file
+	logFile, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666) // NEW
+	if err != nil {
+		// Can't open log file, so just log to stdout and exit
+		slog.Error("Failed to open log file", "error", err)
+		os.Exit(1)
+	}
+	defer logFile.Close() // NEW: Ensure file is closed on exit
+
+	// Create a MultiWriter that writes to both stdout and the file
+	logWriter := io.MultiWriter(os.Stdout, logFile) // NEW
+
+	// Use the MultiWriter as the destination for slog
+	logger := slog.New(slog.NewJSONHandler(logWriter, nil))
+
 	if err := godotenv.Load(); err != nil {
 		logger.Error("error in godotenv.Load(),err:" + err.Error())
 		os.Exit(1)
@@ -41,7 +56,7 @@ func main() {
 	db := db.New(dbConn)
 
 	// new server object
-	srvr := server.NewServer(db)
+	srvr := server.NewServer(db, logger)
 
 	// We run this in a goroutine so it doesn't block the graceful shutdown logic
 	httpServer := &http.Server{
@@ -50,6 +65,8 @@ func main() {
 	}
 
 	go func() {
+		logger.Info(" ------------------------------------------------  ")
+		logger.Info(" ------------------------------------------------  ")
 		logger.Info("Starting server", "port", cfg.port)
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("Server error", "error", err)
@@ -84,7 +101,7 @@ func loadConfig(logger *slog.Logger) *config {
 	}
 
 	if cfg.port == "" {
-		cfg.port = "8080" // Default port
+		cfg.port = "3000" // Default port
 	}
 
 	if cfg.dbURL == "" {
