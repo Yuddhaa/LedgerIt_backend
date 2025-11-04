@@ -1,0 +1,22 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    # 1. Point to your schema snapshot directory
+    schema: "sql/schema"
+    
+    # 2. Point to your application queries directory
+    queries: "sql/queries"
+    
+    # 3. Tell sqlc where to generate the Go code
+    gen:
+      go:
+        package: "db"
+        out: "internal/db" # Generated Go code will go here
+        
+        # --- Recommended Settings ---
+        sql_package: "pgx/v5"
+        emit_json_tags: true
+        emit_interface: true
+        emit_prepared_queries: false
+        emit_exact_table_names: false
+        emit_empty_slices: true

@@ -1,0 +1,48 @@
+# .air.toml
+
+# Root directory where air will start scanning for changes
+root = "."
+# Temporary directory where the generated binaries will be stored
+tmp_dir = "tmp"
+
+# Build-related configuration
+[build]
+  # The binary name for your Go project
+  bin = "tmp/main"
+
+  # Whether to include files in the build process even if not modified
+  include_dir = ["cmd", "internal", "server"]
+  exclude_dir = ["tmp", "sql"]
+
+  # Custom go build flags
+  cmd = "go build -o tmp/main cmd/main/main.go"
+
+# Watch configuration to specify file extensions and directories to watch for changes
+[watch]
+  # The extensions to watch for changes
+  extensions = ["go"]
+
+  # Directories to watch for changes
+  dirs = [
+    "cmd", 
+    "internal",
+    "server"
+  ]
+  
+  # Ignore files or directories that don't need to be watched
+  ignore = [
+    ".git",
+    "tmp",
+    "sql"
+  ]
+
+# Run configuration to automatically execute a command when a change occurs
+[run]
+  # Command to run after detecting file changes
+  cmd = "tmp/main"
+
+# Log configuration (optional)
+[log]
+  # Whether to enable logging of Air's internal operations
+  level = "info"
+

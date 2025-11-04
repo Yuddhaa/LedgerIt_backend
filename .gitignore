@@ -1,0 +1,6 @@
+# Binary files
+/bin
+/tmp
+
+# .env file (for local secrets)
+.env
