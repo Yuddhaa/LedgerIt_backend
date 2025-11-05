@@ -31,6 +31,9 @@ build:
 	@mkdir -p bin
 	@go build -o ./bin/server ./cmd/main/main.go
 
+run: build
+	./bin/server
+
 # Install the 'air' hot-reload tool
 install-air:
 	@echo "Installing/Updating 'air'..."

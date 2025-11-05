@@ -14,6 +14,7 @@ type User struct {
 	Email       string             `json:"email"`
 	Name        pgtype.Text        `json:"name"`
 	PhoneNumber pgtype.Text        `json:"phone_number"`
+	Picture     pgtype.Text        `json:"picture"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }

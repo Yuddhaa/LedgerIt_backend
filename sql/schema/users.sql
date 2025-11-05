@@ -7,6 +7,7 @@ CREATE TABLE users (
     email TEXT NOT NULL UNIQUE,
     name TEXT,
     phone_number TEXT UNIQUE,
+    picture TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

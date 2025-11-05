@@ -16,6 +16,33 @@ type Querier interface {
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	// -- name: UpsertUserByEmail :one
+	// WITH inserted AS (
+	//   INSERT INTO users (google_id, email, name)
+	//   VALUES ($1, $2, $3)
+	//   ON CONFLICT (email) DO NOTHING
+	//   RETURNING *
+	// )
+	// SELECT * FROM inserted
+	// UNION ALL
+	// SELECT * FROM users WHERE email = $2
+	// LIMIT 1;
+	// -- name: UpsertUserByEmail :one
+	// WITH inserted AS (
+	//   INSERT INTO users (google_id, email, name,picture)
+	//   VALUES ($1, $2, $3, $4)
+	//   ON CONFLICT (email) DO NOTHING
+	//   RETURNING id
+	// )
+	// SELECT u.*
+	// FROM users AS u
+	// WHERE u.id IN (
+	//   SELECT i.id FROM inserted AS i
+	//   UNION
+	//   SELECT u2.id FROM users AS u2 WHERE u2.email = $2
+	// )
+	// LIMIT 1;
+	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

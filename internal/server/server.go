@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 
 	"github.com/go-chi/chi/v5"
@@ -30,11 +31,15 @@ func (s *Server) setupRouter() {
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
+	authHandler := auth.NewHandler(s.logger, s.db)
+
 	// Test route
 	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Handler()
 		w.Write([]byte("hello!! Server is up and running"))
 	})
+
+	r.Mount("/api/auth/", authHandler.Routes())
 
 	s.Router = r
 }
