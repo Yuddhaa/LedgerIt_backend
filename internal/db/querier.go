@@ -12,8 +12,19 @@ import (
 
 type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
+	// This is used for logging out a single device.
+	DeleteRefreshTokenByHash(ctx context.Context, tokenHash string) error
+	// DeleteRefreshTokensByUserID deletes all refresh tokens for a specific user.
+	// This is used for the "log out from all devices" feature.
+	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
+	// This is used during the /auth/refresh flow.
+	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
+	// InsertRefreshToken inserts a new refresh token into the database.
+	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	// -- name: UpsertUserByEmail :one

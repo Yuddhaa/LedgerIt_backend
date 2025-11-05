@@ -16,6 +16,7 @@ import (
 	"LedgerIt/internal/server"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
@@ -52,11 +53,17 @@ func main() {
 	dbConn, err := pgx.Connect(dbCtx, cfg.dbURL)
 	if err != nil {
 		logger.Error("error in connecting to db, err:" + err.Error())
+		os.Exit(1)
 	}
 	db := db.New(dbConn)
-
+	pool, err := pgxpool.New(dbCtx, cfg.dbURL)
+	if err != nil {
+		logger.Error("error in connecting to a pool, err:" + err.Error())
+		os.Exit(1)
+	}
+	defer pool.Close()
 	// new server object
-	srvr := server.NewServer(db, logger)
+	srvr := server.NewServer(db, pool, logger)
 
 	// We run this in a goroutine so it doesn't block the graceful shutdown logic
 	httpServer := &http.Server{
