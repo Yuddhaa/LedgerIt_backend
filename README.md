@@ -10,23 +10,23 @@ A simple ledger to maintain expense or income by the employees.
 ~/Yuddhaa/LedgerIt_backend/..
   cmd/main
   └  main.go
-  ✗ ★ internal
-    ★ auth
-    ✗ db
-    ★ helpers
-    ✗ server  # this is the important package which coordinated all other internal packages and is called by main.go
-  ✗ ★ sql
-    ★ migrations  # used by goose for easy updation to tables and to maintain migration versions 
-    ✗ queries    # both of these are used by sqlc to generate internal/db
-    ✗ schema
+   internal
+     auth
+     db
+     helpers
+     server  # this is the important package which coordinated all other internal packages and is called by main.go
+   sql
+     migrations  # used by goose for easy updation to tables and to maintain migration versions 
+     queries    # both of these are used by sqlc to generate internal/db
+     schema
    .air.toml     # for hot reloading
-   ◌ .env
+   .env
    .gitignore
    Makefile
   󰂺 README.md
-   ✗ go.mod
-   ✗ go.sum
-  󰌱 ◌ log.log
+   go.mod
+   go.sum
+  󰌱 log.log
    sqlc.yaml    # sqlc configs
 
 
