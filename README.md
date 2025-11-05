@@ -123,7 +123,7 @@ http://localhost:3000
 
 ## 📜 API Documentation
 
-📄 Full API Reference: [View Postman Docs](https://documenter.getpostman.com/view/47074287/2sB3BALsbn)
+📄 Full API Reference: [View Postman Docs](https://documenter.getpostman.com/view/47074287/2sB3WquLSZ#c78392de-daca-49a3-9191-1e6be32f9214)
 
 ---
 
