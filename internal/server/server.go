@@ -57,13 +57,13 @@ func (s *Server) setupRouter() {
 		s.logger.Handler()
 		w.Write([]byte("hello!! Server is up and running"))
 	})
-	r.Mount("/api/auth/", authHandler.Routes())
+	r.Mount("/api/v1/auth/", authHandler.Routes())
 
 	// ----- Protected Routes -----
 	r.Group(func(r chi.Router) {
 		r.Use(authHandler.JwtAuthMiddleware)
 
-		r.Mount("/api/users/", userHandler.ProtectedRoutes())
+		r.Mount("/api/v1/users/", userHandler.ProtectedRoutes())
 	})
 
 	s.Router = r
