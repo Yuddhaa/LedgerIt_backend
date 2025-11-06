@@ -14,7 +14,7 @@ A simple ledger to maintain expense or income by the employees.
      auth
      db
      helpers
-     server  # this is the important package which coordinated all other internal packages and is called by main.go
+     server  # this is the important package which co-ordinates all other internal packages and is called by main.go
    sql
      migrations  # used by goose for easy updation to tables and to maintain migration versions 
      queries    # both of these are used by sqlc to generate internal/db
@@ -129,6 +129,7 @@ http://localhost:3000
 
 ## 📌 Notes
 
-* Ensure MongoDB is running before starting the app.
+* Ensure PostgreSql is running before starting the app.
+* Ensure all tables with appropriate columns are created. (Just use goose, it's easy to manage the changes to db, if any)
 * Environment variables are required for DB connection.
-* Default server port: **3000** (can be changed in main.go code).
+* Default server port: **3000** (can be changed in main.go or .env file).

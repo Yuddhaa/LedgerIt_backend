@@ -31,7 +31,7 @@ func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) *Handle
 
 func (h *Handler) ProtectedRoutes() chi.Router {
 	r := chi.NewRouter()
-	r.Put("/", h.UpdateUserProfileHandler)
+	r.Put("/me", h.UpdateUserProfileHandler)
 	return r
 }
 
