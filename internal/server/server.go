@@ -63,7 +63,7 @@ func (s *Server) setupRouter() {
 	r.Group(func(r chi.Router) {
 		r.Use(authHandler.JwtAuthMiddleware)
 
-		r.Mount("/api/v1/users/", userHandler.ProtectedRoutes())
+		r.Mount("/api/v1/users/", userHandler.Routes())
 	})
 
 	s.Router = r

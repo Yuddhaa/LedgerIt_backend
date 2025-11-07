@@ -29,7 +29,7 @@ func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) *Handle
 	}
 }
 
-func (h *Handler) ProtectedRoutes() chi.Router {
+func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Put("/me", h.UpdateUserProfileHandler)
 	return r

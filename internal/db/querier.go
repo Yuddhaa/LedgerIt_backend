@@ -11,6 +11,10 @@ import (
 )
 
 type Querier interface {
+	// Adds a user to a business with a specific role, returning the new membership record.
+	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
+	// Creates a new business with a specified name and owner ID, returning the new record.
+	CreateBusiness(ctx context.Context, arg CreateBusinessParams) (Business, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
 	// This is used for logging out a single device.
@@ -18,6 +22,12 @@ type Querier interface {
 	// DeleteRefreshTokensByUserID deletes all refresh tokens for a specific user.
 	// This is used for the "log out from all devices" feature.
 	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	// Retrieves a single business record by its unique ID.
+	GetBusinessByID(ctx context.Context, id pgtype.UUID) (Business, error)
+	// Retrieves all businesses owned by a specific user ID.
+	GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]Business, error)
+	// Retrieves all businesses a user is a member of, including their role and balance in each.
+	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]GetBusinessesByUserIDRow, error)
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)

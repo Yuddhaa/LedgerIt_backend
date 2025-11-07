@@ -73,7 +73,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, 500, "Error starting transaction")
-		h.logger.Error("Failed to begin transaction", "error", err)
+		h.logger.Error("Failed to begin transaction in GoogleAuthHandler", "error", err)
 		return
 	}
 	defer tx.Rollback(r.Context()) // Rollback on any error
@@ -146,7 +146,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// 5. Send Response
 	helpers.PrintResponse("GoogleAuthHandler response: ", resType{User: user, AccessToken: accessToken})
 
-	helpers.RespondWithJSON(w, 200, resType{
+	helpers.RespondWithJSON(w, 201, resType{
 		User:         user,
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken, // <-- Send the raw, unhashed token
