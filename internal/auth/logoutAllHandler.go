@@ -14,8 +14,8 @@ import (
 
 func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	type resType struct {
-		AccessToken  string `json:"accessToken"`
-		RefreshToken string `json:"refreshToken"`
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 
 	// ---------------------------------------------------------------------------------------------------

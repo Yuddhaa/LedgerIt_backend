@@ -10,7 +10,7 @@ import (
 func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	// req and res type + decode body
 	type reqType struct {
-		RefreshToken string `json:"refreshToken"`
+		RefreshToken string `json:"refresh_token"`
 	}
 	type resType struct {
 		Msg string `json:"message"`

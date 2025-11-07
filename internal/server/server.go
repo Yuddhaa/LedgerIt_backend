@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"LedgerIt/internal/auth"
+	"LedgerIt/internal/business"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/users"
 
@@ -50,6 +51,7 @@ func (s *Server) setupRouter() {
 		os.Exit(1)
 	}
 	userHandler := users.NewHandler(s.db, s.pool, s.logger)
+	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
 
 	// ----- public routes -----
 	// Test route
@@ -64,6 +66,7 @@ func (s *Server) setupRouter() {
 		r.Use(authHandler.JwtAuthMiddleware)
 
 		r.Mount("/api/v1/users/", userHandler.Routes())
+		r.Mount("/api/v1/business/", businessHandler.Routes())
 	})
 
 	s.Router = r

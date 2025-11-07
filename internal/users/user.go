@@ -51,7 +51,7 @@ func (h *Handler) UpdateUserProfileHandler(w http.ResponseWriter, r *http.Reques
 	}
 	type reqType struct {
 		Name        string `json:"name"`
-		PhoneNumber string `json:"phoneNumber"`
+		PhoneNumber string `json:"phone_number"`
 	}
 	type resType struct {
 		User db.User `json:"user"`

@@ -19,11 +19,11 @@ import (
 func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	// reqType and resType and decode body
 	type reqType struct {
-		RefreshToken string `json:"refreshToken"`
+		RefreshToken string `json:"refresh_token"`
 	}
 	type resType struct {
-		AccessToken  string `json:"accessToken"`
-		RefreshToken string `json:"refreshToken"`
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
 	}
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

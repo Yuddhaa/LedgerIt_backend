@@ -16,12 +16,12 @@ import (
 func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// req and res type
 	type reqType struct {
-		IdToken string `json:"idToken"`
+		IdToken string `json:"id_token"`
 	}
 	type resType struct {
 		User         db.UpsertUserByEmailRow `json:"user"`
-		AccessToken  string                  `json:"accessToken"`
-		RefreshToken string                  `json:"refreshToken"`
+		AccessToken  string                  `json:"access_token"`
+		RefreshToken string                  `json:"refresh_token"`
 	}
 
 	// ---------------------------------------------------------------------------------------------------
