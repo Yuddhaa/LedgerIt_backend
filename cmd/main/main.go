@@ -55,12 +55,16 @@ func main() {
 	helpers.Logger = logger
 
 	// --- From now on, use helpers.LogInfo and helpers.LogError ---
-
 	if err := godotenv.Load(); err != nil {
-		// CHANGED: Switched to helper and used structured error
-		helpers.LogError("main", "error in godotenv.Load()", "error", err)
-		os.Exit(1)
+		// This is not an error in production, it's expected.
+		// We'll just log that we're not using a .env file.
+		helpers.LogInfo("main", "could not load .env file, using environment variables")
 	}
+	// if err := godotenv.Load(); err != nil {
+	// 	// CHANGED: Switched to helper and used structured error
+	// 	helpers.LogError("main", "error in godotenv.Load()", "error", err)
+	// 	os.Exit(1)
+	// }
 
 	// CHANGED: Removed logger param, it's now global in helpers
 	cfg := loadConfig()
