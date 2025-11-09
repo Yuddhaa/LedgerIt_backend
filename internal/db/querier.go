@@ -11,11 +11,70 @@ import (
 )
 
 type Querier interface {
+	// Adds a user to a business with a specific role, returning the new membership record.
+	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
+	// -- Creates a new business with a specified name and owner ID, returning the new record.
+	// -- name: CreateBusiness :one
+	// INSERT INTO businesses (
+	//     name,
+	//     owner_id
+	// ) VALUES (
+	//     $1, $2
+	// )
+	// RETURNING *;
+	//
+	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
+	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
+	// This is used for logging out a single device.
+	DeleteRefreshTokenByHash(ctx context.Context, tokenHash string) error
+	// DeleteRefreshTokensByUserID deletes all refresh tokens for a specific user.
+	// This is used for the "log out from all devices" feature.
+	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	// Retrieves a single business record by its unique ID.
+	GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error)
+	// Retrieves all businesses owned by a specific user ID.
+	GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]Business, error)
+	// Retrieves all businesses a user is a member of, including their role and balance in each.
+	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
+	// Based on userid and businessid it will return role
+	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
+	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
+	// This is used during the /auth/refresh flow.
+	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
+	// InsertRefreshToken inserts a new refresh token into the database.
+	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	// -- name: UpsertUserByEmail :one
+	// WITH inserted AS (
+	//   INSERT INTO users (google_id, email, name)
+	//   VALUES ($1, $2, $3)
+	//   ON CONFLICT (email) DO NOTHING
+	//   RETURNING *
+	// )
+	// SELECT * FROM inserted
+	// UNION ALL
+	// SELECT * FROM users WHERE email = $2
+	// LIMIT 1;
+	// -- name: UpsertUserByEmail :one
+	// WITH inserted AS (
+	//   INSERT INTO users (google_id, email, name,picture)
+	//   VALUES ($1, $2, $3, $4)
+	//   ON CONFLICT (email) DO NOTHING
+	//   RETURNING id
+	// )
+	// SELECT u.*
+	// FROM users AS u
+	// WHERE u.id IN (
+	//   SELECT i.id FROM inserted AS i
+	//   UNION
+	//   SELECT u2.id FROM users AS u2 WHERE u2.email = $2
+	// )
+	// LIMIT 1;
+	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
 }
 
 var _ Querier = (*Queries)(nil)

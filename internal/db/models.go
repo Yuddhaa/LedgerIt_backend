@@ -5,15 +5,131 @@
 package db
 
 import (
+	"database/sql/driver"
+	"fmt"
+
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type ApprovalStatus string
+
+const (
+	ApprovalStatusPending  ApprovalStatus = "pending"
+	ApprovalStatusApproved ApprovalStatus = "approved"
+	ApprovalStatusRejected ApprovalStatus = "rejected"
+)
+
+func (e *ApprovalStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = ApprovalStatus(s)
+	case string:
+		*e = ApprovalStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for ApprovalStatus: %T", src)
+	}
+	return nil
+}
+
+type NullApprovalStatus struct {
+	ApprovalStatus ApprovalStatus `json:"approval_status"`
+	Valid          bool           `json:"valid"` // Valid is true if ApprovalStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullApprovalStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.ApprovalStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.ApprovalStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullApprovalStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.ApprovalStatus), nil
+}
+
+type BusinessRole string
+
+const (
+	BusinessRoleCreator  BusinessRole = "creator"
+	BusinessRoleAdmin    BusinessRole = "admin"
+	BusinessRoleEmployee BusinessRole = "employee"
+)
+
+func (e *BusinessRole) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = BusinessRole(s)
+	case string:
+		*e = BusinessRole(s)
+	default:
+		return fmt.Errorf("unsupported scan type for BusinessRole: %T", src)
+	}
+	return nil
+}
+
+type NullBusinessRole struct {
+	BusinessRole BusinessRole `json:"business_role"`
+	Valid        bool         `json:"valid"` // Valid is true if BusinessRole is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullBusinessRole) Scan(value interface{}) error {
+	if value == nil {
+		ns.BusinessRole, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.BusinessRole.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullBusinessRole) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.BusinessRole), nil
+}
+
+type Business struct {
+	ID        pgtype.UUID        `json:"id"`
+	Name      string             `json:"name"`
+	OwnerID   pgtype.UUID        `json:"owner_id"`
+	CreatedAt pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+}
+
+type BusinessMember struct {
+	ID             pgtype.UUID        `json:"id"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	BusinessID     pgtype.UUID        `json:"business_id"`
+	Role           BusinessRole       `json:"role"`
+	CurrentBalance pgtype.Numeric     `json:"current_balance"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
+type RefreshToken struct {
+	ID         pgtype.UUID        `json:"id"`
+	UserID     pgtype.UUID        `json:"user_id"`
+	TokenHash  string             `json:"token_hash"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+	DeviceInfo pgtype.Text        `json:"device_info"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
 type User struct {
 	ID          pgtype.UUID        `json:"id"`
-	GoogleID    string             `json:"google_id"`
-	Email       string             `json:"email"`
 	Name        pgtype.Text        `json:"name"`
+	Email       string             `json:"email"`
 	PhoneNumber pgtype.Text        `json:"phone_number"`
+	GoogleID    string             `json:"google_id"`
+	Picture     pgtype.Text        `json:"picture"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
