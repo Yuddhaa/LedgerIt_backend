@@ -3,7 +3,6 @@ package helpers
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"net/http"
 )
 
@@ -30,13 +29,4 @@ func AnyToString(payload any, variable *string) error {
 	}
 	*variable = str
 	return nil
-}
-
-func PrintResponse(msg string, payload any) {
-	data, _ := json.MarshalIndent(payload, "", "    ")
-	if msg == "" {
-		fmt.Printf("\ndata : %v \n", string(data))
-	} else {
-		fmt.Printf("\n%v \n%v\n", msg, string(data))
-	}
 }

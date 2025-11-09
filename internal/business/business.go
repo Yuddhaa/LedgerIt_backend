@@ -1,7 +1,7 @@
 package business
 
 import (
-	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -11,16 +11,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Handler holds all dependencies for the business-related HTTP handlers.
 type Handler struct {
 	db     *db.Queries
 	pool   *pgxpool.Pool
-	logger *slog.Logger
+	logger *slog.Logger // Base file logger
 }
 
+// NewHandler creates a new instance of the business Handler.
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) *Handler {
 	return &Handler{
 		db:     db,
@@ -29,85 +31,50 @@ func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) *Handle
 	}
 }
 
+// Routes defines and returns all routes for the business package.
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Post("/", h.CreateBusinessHandler)
+	r.Get("/", h.GetAllBusinessHandler)
+	r.Get("/own", h.GetOwnedBusinessHandler)
+
+	// Routes that require a business ID
+	r.Route("/{id}", func(r chi.Router) {
+		r.Get("/", h.GetBusinessHandler)
+		r.Post("/add", h.AddMemberHandler)
+	})
 	return r
 }
 
-func (h *Handler) CreateBusinessHandler(w http.ResponseWriter, r *http.Request) {
-	type reqType struct {
-		Name string `json:"name"`
-	}
-	type resType struct {
-		Business db.Business `json:"business"`
-	}
-	var body reqType
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Request,"+err.Error())
-		h.logger.Error("Bad Request in CreateBusinessHandler", "error", err)
-		return
-	}
-	// extract userId from r.context
+// --- Internal Helper Functions ---
+
+// getUserIDFromContext is an internal helper to centralize extracting
+// and parsing the UserID from the request context.
+func (h *Handler) getUserIDFromContext(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	claims, ok := auth.GetClaimsFromContext(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, 500, "could now retrieve claims from context in CreateBusinessHandler")
-		h.logger.Error("could now retrieve claims from context in CreateBusinessHandler")
-		return
+		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve claims from context")
+		// CHANGED: This is a server error; middleware should guarantee claims.
+		helpers.LogError("getUserIDFromContext", "could not retrieve claims from context")
+		return uuid.Nil, false
 	}
+
 	userId, err := uuid.Parse(claims.UserId)
 	if err != nil {
-		helpers.RespondWithError(w, 500, "count not convert userId to uuid in CreateBusinessHandler,err:"+err.Error())
-		h.logger.Error("count not convert userId to uuid in CreateBusinessHandler,err:", "err", err)
-		return
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		// CHANGED: Claims are malformed, this is a server bug. Don't leak error.
+		helpers.LogError("getUserIDFromContext", "could not parse userId from claims", "error", err, "claim_user_id", claims.UserId)
+		return uuid.Nil, false
 	}
 
-	// -------------------------------------------------------------------------------
-	// begin transaction
-	tx, err := h.pool.Begin(r.Context())
-	if err != nil {
-		helpers.RespondWithError(w, 500, "could not start transaction in CreateBusiness,err:"+err.Error())
-		h.logger.Error("could not start transaction in CreateBusiness,err:" + err.Error())
-		return
-	}
-	defer tx.Rollback(r.Context())
-	qtx := h.db.WithTx(tx)
+	return userId, true
+}
 
-	userUuid := pgtype.UUID{
-		Bytes: userId,
-		Valid: userId != uuid.Nil,
+// isUniqueViolation is a helper function to check for a PostgreSQL unique_violation error (code 23505).
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
 	}
-
-	// create business
-	business, err := qtx.CreateBusiness(r.Context(), db.CreateBusinessParams{
-		OwnerID: userUuid,
-		Name:    body.Name,
-	})
-	if err != nil {
-		helpers.RespondWithError(w, 500, "db error in CreateBusiness,err:"+err.Error())
-		h.logger.Error("db error in CreateBusiness,err:", "err", err)
-		return
-	}
-
-	// add the owner to business members.
-	_, err = qtx.AddBusinessMember(r.Context(), db.AddBusinessMemberParams{
-		UserID:     userUuid,
-		BusinessID: business.ID,
-		Role:       db.BusinessRole(db.BusinessRoleCreator),
-	})
-	if err != nil {
-		helpers.RespondWithError(w, 500, "db error in AddBusinessMember,err:"+err.Error())
-		h.logger.Error("db error in CreateBusiness,err:", "err", err)
-		return
-	}
-
-	if err := tx.Commit(r.Context()); err != nil {
-		helpers.RespondWithError(w, 500, "Error committing transaction")
-		h.logger.Error("Failed to commit transaction in CreateBusinessHandler", "error", err)
-		return
-	}
-
-	helpers.RespondWithJSON(w, 201, resType{
-		Business: business,
-	})
+	return false
 }

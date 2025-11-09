@@ -12,6 +12,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// LogoutAllHandler logs a user out of all devices.
+// It performs the following steps:
+// 1. Reads the user's ID from the JWT claims.
+// 2. Starts a database transaction.
+// 3. Deletes *all* existing refresh tokens for that user.
+// 4. Inserts *one* new refresh token for the current device.
+// 5. Commits the transaction.
+// 6. Issues a new access token and returns both new tokens to the client.
 func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	type resType struct {
 		AccessToken  string `json:"access_token"`
@@ -22,8 +30,9 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Get Claims from context
 	claims, ok := GetClaimsFromContext(r.Context())
 	if !ok {
-		helpers.RespondWithError(w, 500, "could now retrieve claims from context")
-		h.logger.Error("could now retrieve claims from context")
+		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve claims from context")
+		// CHANGED: This is a server error; the middleware should guarantee claims.
+		helpers.LogError("LogoutAllHandler", "could not retrieve claims from context")
 		return
 	}
 
@@ -34,8 +43,9 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	userId := claims.UserId
 	userUuid, err := uuid.Parse(userId)
 	if err != nil {
-		helpers.RespondWithError(w, 500, "error in converting userId to uuid: "+err.Error())
-		h.logger.Error("error in converting userId to uuid", "error", err)
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		// CHANGED: This is a critical server error; claims are malformed.
+		helpers.LogError("LogoutAllHandler", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
 		return
 	}
 	pgTypeUuid := pgtype.UUID{
@@ -46,8 +56,9 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate the new refresh token
 	refreshToken, err := generateSecureRandomString(32)
 	if err != nil {
-		helpers.RespondWithError(w, 500, "err in generateSecureRandomString, err:"+err.Error())
-		h.logger.Error("err in generateSecureRandomString, err:" + err.Error())
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		// CHANGED: Use helper for structured logging.
+		helpers.LogError("LogoutAllHandler", "err in generateSecureRandomString", "error", err)
 		return
 	}
 	hashedRandStr := hashToken(refreshToken)
@@ -57,8 +68,9 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	// 3. Begin Transaction
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
-		helpers.RespondWithError(w, 500, "Error starting transaction")
-		h.logger.Error("Failed to begin transaction", "error", err)
+		helpers.RespondWithError(w, http.StatusInternalServerError, "Error starting transaction")
+		// CHANGED: Use helper for structured logging.
+		helpers.LogError("LogoutAllHandler", "Failed to begin transaction", "error", err)
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -67,8 +79,9 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 3a. Delete all old tokens for this user
 	if err := qtx.DeleteRefreshTokensByUserID(r.Context(), pgTypeUuid); err != nil {
-		helpers.RespondWithError(w, 500, "error in DeleteRefreshTokensByUserID, err:"+err.Error())
-		h.logger.Error("error in tx DeleteRefreshTokensByUserID", "error", err)
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		// CHANGED: Use helper for structured logging.
+		helpers.LogError("LogoutAllHandler", "error in tx DeleteRefreshTokensByUserID", "error", err, "user_id", userId)
 		return // Rollback is deferred
 	}
 
@@ -85,15 +98,17 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 			Valid:  deviceInfo != "",
 		},
 	}); err != nil {
-		helpers.RespondWithError(w, 500, "err in InsertRefreshToken, err:"+err.Error())
-		h.logger.Error("err in tx InsertRefreshToken", "error", err)
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		// CHANGED: Use helper for structured logging.
+		helpers.LogError("LogoutAllHandler", "err in tx InsertRefreshToken", "error", err, "user_id", userId)
 		return // Rollback is deferred
 	}
 
 	// 3c. Commit
 	if err := tx.Commit(r.Context()); err != nil {
-		helpers.RespondWithError(w, 500, "Error committing transaction")
-		h.logger.Error("Failed to commit transaction", "error", err)
+		helpers.RespondWithError(w, http.StatusInternalServerError, "Error committing transaction")
+		// CHANGED: Use helper for structured logging.
+		helpers.LogError("LogoutAllHandler", "Failed to commit transaction", "error", err)
 		return
 	}
 
@@ -108,13 +123,18 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}, h.jwtSecret)
 	if err != nil {
-		helpers.RespondWithError(w, http.StatusInternalServerError, "Error: "+err.Error())
-		h.logger.Error("error in signing the jwt token, err:" + err.Error())
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		// CHANGED: Use helper for structured logging.
+		helpers.LogError("LogoutAllHandler", "error in signing the jwt token", "error", err)
 		return
 	}
 
 	// ---------------------------------------------------------------------------------------------------
 	// 5. Respond
+
+	// ADDED: Log the successful event.
+	helpers.LogInfo("LogoutAllHandler", "user logged out of all devices", "user_id", userId)
+
 	helpers.RespondWithJSON(w, 200, resType{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"LedgerIt/internal/db"
+	"LedgerIt/internal/helpers" // Make sure helpers is imported
 	"LedgerIt/internal/server"
 
 	"github.com/jackc/pgx/v5"
@@ -26,82 +27,106 @@ type config struct {
 }
 
 func main() {
-	// Open the log file
-	logFile, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666) // NEW
+	// 1. Open the log file
+	logFile, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
-		// Can't open log file, so just log to stdout and exit
+		// Can't use helpers yet, so just use slog
 		slog.Error("Failed to open log file", "error", err)
 		os.Exit(1)
 	}
-	defer logFile.Close() // NEW: Ensure file is closed on exit
+	defer logFile.Close()
 
-	// Create a MultiWriter that writes to both stdout and the file
-	logWriter := io.MultiWriter(os.Stdout, logFile) // NEW
+	//  2. Create a JSON handler that *only* writes to the file.
+	fileHandler := slog.NewJSONHandler(logFile, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	})
 
-	// Use the MultiWriter as the destination for slog
-	logger := slog.New(slog.NewJSONHandler(logWriter, nil))
+	// 3. Create the logger
+	logger := slog.New(fileHandler)
+
+	// 4. Set the default logger and redirect the standard 'log' package
+	slog.SetDefault(logger)
+
+	slogAdapter := slog.NewLogLogger(logger.Handler(), slog.LevelInfo)
+	log.SetOutput(slogAdapter.Writer())
+	log.SetFlags(0)
+
+	// 5. Inject the file-only logger into your helpers package
+	helpers.Logger = logger
+
+	// --- From now on, use helpers.LogInfo and helpers.LogError ---
 
 	if err := godotenv.Load(); err != nil {
-		logger.Error("error in godotenv.Load(),err:" + err.Error())
+		// CHANGED: Switched to helper and used structured error
+		helpers.LogError("main", "error in godotenv.Load()", "error", err)
 		os.Exit(1)
 	}
-	cfg := loadConfig(logger)
+
+	// CHANGED: Removed logger param, it's now global in helpers
+	cfg := loadConfig()
 
 	// db connection
 	dbCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 	dbConn, err := pgx.Connect(dbCtx, cfg.dbURL)
 	if err != nil {
-		logger.Error("error in connecting to db, err:" + err.Error())
+		// CHANGED: Switched to helper and used structured error
+		helpers.LogError("main", "error in connecting to db", "error", err)
 		os.Exit(1)
 	}
 	db := db.New(dbConn)
 	pool, err := pgxpool.New(dbCtx, cfg.dbURL)
 	if err != nil {
-		logger.Error("error in connecting to a pool, err:" + err.Error())
+		// CHANGED: Switched to helper and used structured error
+		helpers.LogError("main", "error in connecting to a pool", "error", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
+
 	// new server object
 	srvr := server.NewServer(db, pool, logger)
 
-	// We run this in a goroutine so it doesn't block the graceful shutdown logic
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%v", cfg.port),
-		Handler: srvr.Router, // srv.Router is the main chi.Mux
+		Handler: srvr.Router,
 	}
 
 	go func() {
-		logger.Info(" ------------------------------------------------  ")
-		logger.Info(" ------------------------------------------------  ")
-		logger.Info("Starting server", "port", cfg.port)
+		// CHANGED: Switched to helper
+		logger.Info(" ------------------------------------------------ ")
+		helpers.LogInfo("main", "Starting server", "port", cfg.port)
+		logger.Info(" ------------------------------------------------ ")
+
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			logger.Error("Server error", "error", err)
+			// CHANGED: Switched to helper
+			helpers.LogError("main", "Server error", "error", err)
 			os.Exit(1)
 		}
 	}()
 
 	// --- Handle Graceful Shutdown ---
-	// Wait for an interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("Shutting down server...")
+	// CHANGED: Switched to helper
+	helpers.LogInfo("main", "Shutting down server...")
 
-	// Create a context with a timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		logger.Error("Server shutdown failed", "error", err)
+		// CHANGED: Swwitched to helper
+		helpers.LogError("main", "Server shutdown failed", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("Server exited gracefully")
+	// CHANGED: Switched to helper
+	helpers.LogInfo("main", "Server exited gracefully")
 }
 
-func loadConfig(logger *slog.Logger) *config {
+// CHANGED: Removed logger parameter, now uses helpers package directly
+func loadConfig() *config {
 	cfg := &config{
 		port:  os.Getenv("PORT"),
 		dbURL: os.Getenv("DBURL"),
@@ -112,7 +137,9 @@ func loadConfig(logger *slog.Logger) *config {
 	}
 
 	if cfg.dbURL == "" {
-		logger.Error("DBURL must be set in environment variables")
+		// CHANGED: Switched to helper
+		helpers.LogError("loadConfig", "DBURL must be set in environment variables")
+		// Note: You might want to os.Exit(1) here too
 	}
 
 	return cfg

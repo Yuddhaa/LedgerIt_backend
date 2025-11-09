@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,7 @@ import (
 	"strings"
 
 	"LedgerIt/internal/db"
+	"LedgerIt/internal/helpers" // <-- ADDED THIS IMPORT
 
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
@@ -20,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// Claims represents the data stored within the JWT.
 type Claims struct {
 	UserId string `json:"userId"`
 	jwt.RegisteredClaims
@@ -31,33 +34,40 @@ type contextKey string
 // userClaimsKey is the key we'll use to store and retrieve user Claims in the request context.
 const userClaimsKey contextKey = "userClaims"
 
+// Handler holds dependencies for auth-related HTTP handlers.
 type Handler struct {
-	logger            *slog.Logger
-	db                *db.Queries
-	pool              *pgxpool.Pool
-	googleWebClientId string
-	jwtSecret         string
+	logger         *slog.Logger
+	db             *db.Queries
+	pool           *pgxpool.Pool
+	googleClientId string
+	jwtSecret      string
 }
 
+// NewHandler creates a new auth Handler, validating required environment variables.
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) (*Handler, error) {
 	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
 	if googleClientID == "" {
+		// This is a fatal startup error, log it as such.
+		helpers.LogError("auth.NewHandler", "GOOGLE_CLIENT_ID is not set in environment")
 		return nil, fmt.Errorf("GOOGLE_CLIENT_ID is not set")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
+		// This is also a fatal startup error.
+		helpers.LogError("auth.NewHandler", "JWT_SECRET is not set in environment")
 		return nil, fmt.Errorf("JWT_SECRET is not set")
 	}
 	return &Handler{
-		logger:            logger,
-		db:                db,
-		pool:              pool,
-		googleWebClientId: googleClientID,
-		jwtSecret:         jwtSecret,
+		logger:         logger,
+		db:             db,
+		pool:           pool,
+		googleClientId: googleClientID,
+		jwtSecret:      jwtSecret,
 	}, nil
 }
 
+// Routes defines and returns all auth-related routes, applying middleware as needed.
 func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 
@@ -79,13 +89,16 @@ func (h *Handler) Routes() chi.Router {
 	return r
 }
 
-// helper funcitons below
+// --- Helper Functions ---
+
 // GenerateJwt creates a signed JWT token using the provided claims and secret key.
 // It returns the generated JWT string or an error if signing fails.
 func GenerateJwt(jwtClaims *Claims, jwtSecret string) (string, error) {
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwtClaims)
 	jwt, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
+		// This is a server-side error during the token signing process.
+		helpers.LogError("auth.GenerateJwt", "failed to sign JWT", "error", err)
 		return "", err
 	}
 	return jwt, nil
@@ -99,7 +112,8 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 		// 1. Get the Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			h.logger.Warn("Auth failed: Authorization header missing")
+			// This is a client error, not a server error. Log as Info.
+			helpers.LogInfo("auth.JwtAuthMiddleware", "Auth failed: Authorization header missing")
 			http.Error(w, "Authorization header required", http.StatusUnauthorized)
 			return
 		}
@@ -107,7 +121,8 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 		// 2. Validate the format ("Bearer <token>")
 		parts := strings.Split(authHeader, " ")
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			h.logger.Warn("Auth failed: Invalid Authorization header format")
+			// Client error.
+			helpers.LogInfo("auth.JwtAuthMiddleware", "Auth failed: Invalid Authorization header format")
 			http.Error(w, "Invalid authorization header format", http.StatusUnauthorized)
 			return
 		}
@@ -118,15 +133,19 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 			// Security check: Make sure the token's signing method is what we expect
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				// This is a potential security issue (e.g., alg-none attack). Log as Error.
+				alg := token.Header["alg"]
+				helpers.LogError("auth.JwtAuthMiddleware", "Unexpected JWT signing method", "algorithm", alg)
+				return nil, fmt.Errorf("unexpected signing method: %v", alg)
 			}
 			// Return the secret key
 			return []byte(h.jwtSecret), nil
 		})
 		// 4. Handle parsing errors
 		if err != nil {
-			h.logger.Warn("Auth failed: Token parsing error", "error", err)
-			if err == jwt.ErrTokenExpired {
+			// Client error (e.g., expired token, malformed token). Log as Info.
+			helpers.LogInfo("auth.JwtAuthMiddleware", "Auth failed: Token parsing error", "error", err.Error())
+			if errors.Is(err, jwt.ErrTokenExpired) {
 				http.Error(w, "Token has expired", http.StatusUnauthorized)
 			} else {
 				http.Error(w, "Invalid token", http.StatusUnauthorized)
@@ -136,7 +155,8 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 
 		// 5. Final check for token validity
 		if !token.Valid {
-			h.logger.Warn("Auth failed: Invalid token", "token", tokenString)
+			// Client error.
+			helpers.LogInfo("auth.JwtAuthMiddleware", "Auth failed: Invalid token")
 			http.Error(w, "Invalid token", http.StatusUnauthorized)
 			return
 		}
@@ -167,41 +187,26 @@ func (h *Handler) uuidToString(id pgtype.UUID) string {
 
 // generateSecureRandomString creates a cryptographically secure, random string
 // encoded as hex.
-//
-// We use crypto/rand, which is a cryptographically secure pseudorandom number
-// generator, as opposed to math/rand, which is not secure.
-//
-// n: The number of random bytes to generate.
-// The resulting hex string will be 2*n characters long.
-// For example, n=32 bytes will produce a 64-character string.
 func generateSecureRandomString(n int) (string, error) {
 	if n <= 0 {
+		// This is a programmer error (calling the func incorrectly).
+		helpers.LogError("auth.generateSecureRandomString", "n must be positive", "n_value", n)
 		return "", fmt.Errorf("number of bytes (n) must be positive")
 	}
 
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
-		// This is a rare error, indicating a problem with the OS's entropy source.
+		// This is a rare, critical system-level error.
+		helpers.LogError("auth.generateSecureRandomString", "failed to read from crypto/rand", "error", err)
 		return "", fmt.Errorf("failed to read from crypto/rand: %w", err)
 	}
 
-	// hex.EncodeToString is fast, URL-safe, and doubles the length
-	// of the byte slice.
 	return hex.EncodeToString(b), nil
 }
 
-// hashToken creates a SHA-256 hash of a given string.
-//
-// We use SHA-256 (not bcrypt) because the input token is already a high-entropy
-// random string. We don't need a slow, "password-stretching" algorithm like
-// bcrypt. We just need a fast, one-way hash to store in the database
-// so we aren't storing the raw token in plaintext.
+// hashToken creates a SHA-256 hash of a given string (e.g., a refresh token).
+// This is for fast, one-way storage, not for password hashing.
 func hashToken(token string) string {
-	// Create a new SHA-256 hash object
-	// sha256.Sum256 returns a [32]byte array
 	hashBytes := sha256.Sum256([]byte(token))
-
-	// Convert the byte array to a hex string
-	// We use hashBytes[:] to get a slice from the array
 	return hex.EncodeToString(hashBytes[:])
 }

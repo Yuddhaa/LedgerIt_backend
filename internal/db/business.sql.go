@@ -43,24 +43,33 @@ func (q *Queries) AddBusinessMember(ctx context.Context, arg AddBusinessMemberPa
 	return i, err
 }
 
-const createBusiness = `-- name: CreateBusiness :one
-INSERT INTO businesses (
-    name,
-    owner_id
-) VALUES (
-    $1, $2
+const createBusinessAndAddOwner = `-- name: CreateBusinessAndAddOwner :one
+SELECT id, name, owner_id, created_at, updated_at FROM create_business_and_add_owner(
+    p_owner_id := $1,
+    p_name := $2
 )
-RETURNING id, name, owner_id, created_at, updated_at
 `
 
-type CreateBusinessParams struct {
-	Name    string      `json:"name"`
-	OwnerID pgtype.UUID `json:"owner_id"`
+type CreateBusinessAndAddOwnerParams struct {
+	POwnerID pgtype.UUID `json:"p_owner_id"`
+	PName    string      `json:"p_name"`
 }
 
-// Creates a new business with a specified name and owner ID, returning the new record.
-func (q *Queries) CreateBusiness(ctx context.Context, arg CreateBusinessParams) (Business, error) {
-	row := q.db.QueryRow(ctx, createBusiness, arg.Name, arg.OwnerID)
+// -- Creates a new business with a specified name and owner ID, returning the new record.
+// -- name: CreateBusiness :one
+// INSERT INTO businesses (
+//
+//	name,
+//	owner_id
+//
+// ) VALUES (
+//
+//	$1, $2
+//
+// )
+// RETURNING *;
+func (q *Queries) CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error) {
+	row := q.db.QueryRow(ctx, createBusinessAndAddOwner, arg.POwnerID, arg.PName)
 	var i Business
 	err := row.Scan(
 		&i.ID,
@@ -73,20 +82,42 @@ func (q *Queries) CreateBusiness(ctx context.Context, arg CreateBusinessParams) 
 }
 
 const getBusinessByID = `-- name: GetBusinessByID :one
-SELECT id, name, owner_id, created_at, updated_at FROM businesses
-WHERE id = $1
+SELECT b.id, b.name, b.owner_id, b.created_at, b.updated_at,bm.user_id,bm.role,bm.current_balance 
+FROM businesses b
+JOIN
+    business_members bm ON b.id = bm.business_id
+WHERE bm.user_id = $1 and b.id = $2
 `
 
+type GetBusinessByIDParams struct {
+	UserID pgtype.UUID `json:"user_id"`
+	ID     pgtype.UUID `json:"id"`
+}
+
+type GetBusinessByIDRow struct {
+	ID             pgtype.UUID        `json:"id"`
+	Name           string             `json:"name"`
+	OwnerID        pgtype.UUID        `json:"owner_id"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
+	UserID         pgtype.UUID        `json:"user_id"`
+	Role           BusinessRole       `json:"role"`
+	CurrentBalance pgtype.Numeric     `json:"current_balance"`
+}
+
 // Retrieves a single business record by its unique ID.
-func (q *Queries) GetBusinessByID(ctx context.Context, id pgtype.UUID) (Business, error) {
-	row := q.db.QueryRow(ctx, getBusinessByID, id)
-	var i Business
+func (q *Queries) GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error) {
+	row := q.db.QueryRow(ctx, getBusinessByID, arg.UserID, arg.ID)
+	var i GetBusinessByIDRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.UserID,
+		&i.Role,
+		&i.CurrentBalance,
 	)
 	return i, err
 }
@@ -125,9 +156,9 @@ func (q *Queries) GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUI
 
 const getBusinessesByUserID = `-- name: GetBusinessesByUserID :many
 SELECT 
-    b.id, b.name, b.owner_id, b.created_at, b.updated_at, 
-    bm.role, 
-    bm.current_balance
+    b.id, b.name, b.owner_id, b.created_at, b.updated_at
+    -- bm.role, 
+    -- bm.current_balance
 FROM 
     businesses b
 JOIN 
@@ -136,34 +167,22 @@ WHERE
     bm.user_id = $1
 `
 
-type GetBusinessesByUserIDRow struct {
-	ID             pgtype.UUID        `json:"id"`
-	Name           string             `json:"name"`
-	OwnerID        pgtype.UUID        `json:"owner_id"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	Role           BusinessRole       `json:"role"`
-	CurrentBalance pgtype.Numeric     `json:"current_balance"`
-}
-
 // Retrieves all businesses a user is a member of, including their role and balance in each.
-func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]GetBusinessesByUserIDRow, error) {
+func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error) {
 	rows, err := q.db.Query(ctx, getBusinessesByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []GetBusinessesByUserIDRow{}
+	items := []Business{}
 	for rows.Next() {
-		var i GetBusinessesByUserIDRow
+		var i Business
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.OwnerID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
-			&i.Role,
-			&i.CurrentBalance,
 		); err != nil {
 			return nil, err
 		}
@@ -173,4 +192,21 @@ func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID)
 		return nil, err
 	}
 	return items, nil
+}
+
+const getMemberRole = `-- name: GetMemberRole :one
+Select bm.role from business_members bm WHERE bm.user_id = $1 AND bm.business_id = $2
+`
+
+type GetMemberRoleParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// Based on userid and businessid it will return role
+func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error) {
+	row := q.db.QueryRow(ctx, getMemberRole, arg.UserID, arg.BusinessID)
+	var role BusinessRole
+	err := row.Scan(&role)
+	return role, err
 }
