@@ -72,7 +72,7 @@ func (s *Server) setupRouter() {
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
 
 	// --- Public Routes ---
-	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		helpers.LogInfo("setupRouter", "server is up and running", "route", "/")
 		w.Write([]byte("hello!! Server is up and running"))
 	})

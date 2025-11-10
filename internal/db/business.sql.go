@@ -55,19 +55,6 @@ type CreateBusinessAndAddOwnerParams struct {
 	PName    string      `json:"p_name"`
 }
 
-// -- Creates a new business with a specified name and owner ID, returning the new record.
-// -- name: CreateBusiness :one
-// INSERT INTO businesses (
-//
-//	name,
-//	owner_id
-//
-// ) VALUES (
-//
-//	$1, $2
-//
-// )
-// RETURNING *;
 func (q *Queries) CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error) {
 	row := q.db.QueryRow(ctx, createBusinessAndAddOwner, arg.POwnerID, arg.PName)
 	var i Business
@@ -120,6 +107,51 @@ func (q *Queries) GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams
 		&i.CurrentBalance,
 	)
 	return i, err
+}
+
+const getBusinessMembers = `-- name: GetBusinessMembers :many
+SELECT u.id, u.name, u.email, u.phone_number, bm.role, bm.current_balance
+FROM users u
+JOIN business_members bm ON bm.user_id = u.id
+WHERE bm.business_id = $1
+ORDER BY u.name
+`
+
+type GetBusinessMembersRow struct {
+	ID             pgtype.UUID    `json:"id"`
+	Name           pgtype.Text    `json:"name"`
+	Email          string         `json:"email"`
+	PhoneNumber    pgtype.Text    `json:"phone_number"`
+	Role           BusinessRole   `json:"role"`
+	CurrentBalance pgtype.Numeric `json:"current_balance"`
+}
+
+// GetBusinessMembers returns all the particular business members
+func (q *Queries) GetBusinessMembers(ctx context.Context, businessID pgtype.UUID) ([]GetBusinessMembersRow, error) {
+	rows, err := q.db.Query(ctx, getBusinessMembers, businessID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetBusinessMembersRow{}
+	for rows.Next() {
+		var i GetBusinessMembersRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.Email,
+			&i.PhoneNumber,
+			&i.Role,
+			&i.CurrentBalance,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const getBusinessesByOwnerID = `-- name: GetBusinessesByOwnerID :many
@@ -209,4 +241,24 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (B
 	var role BusinessRole
 	err := row.Scan(&role)
 	return role, err
+}
+
+const isUserMemberOfBusiness = `-- name: IsUserMemberOfBusiness :one
+SELECT 1
+FROM business_members
+WHERE user_id = $1 AND business_id = $2
+LIMIT 1
+`
+
+type IsUserMemberOfBusinessParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// returns 1 if a user is a member of the given businessId
+func (q *Queries) IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOfBusinessParams) (int32, error) {
+	row := q.db.QueryRow(ctx, isUserMemberOfBusiness, arg.UserID, arg.BusinessID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
 }

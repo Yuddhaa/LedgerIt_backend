@@ -42,6 +42,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Route("/{id}", func(r chi.Router) {
 		r.Get("/", h.GetBusinessHandler)
 		r.Post("/add", h.AddMemberHandler)
+		r.Get("/members", h.GetBusinessMembers)
 	})
 	return r
 }

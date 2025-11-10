@@ -1,13 +1,3 @@
--- -- Creates a new business with a specified name and owner ID, returning the new record.
--- -- name: CreateBusiness :one
--- INSERT INTO businesses (
---     name,
---     owner_id
--- ) VALUES (
---     $1, $2
--- )
--- RETURNING *;
---
 -- name: CreateBusinessAndAddOwner :one
 SELECT * FROM create_business_and_add_owner(
     p_owner_id := $1,
@@ -54,3 +44,18 @@ WHERE
 -- name: GetBusinessesByOwnerID :many
 SELECT * FROM businesses
 WHERE owner_id = $1;
+
+-- GetBusinessMembers returns all the particular business members
+-- name: GetBusinessMembers :many
+SELECT u.id, u.name, u.email, u.phone_number, bm.role, bm.current_balance
+FROM users u
+JOIN business_members bm ON bm.user_id = u.id
+WHERE bm.business_id = $1
+ORDER BY u.name;
+
+-- returns 1 if a user is a member of the given businessId
+-- name: IsUserMemberOfBusiness :one
+SELECT 1
+FROM business_members
+WHERE user_id = $1 AND business_id = $2
+LIMIT 1;

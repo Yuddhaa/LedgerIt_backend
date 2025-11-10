@@ -13,16 +13,6 @@ import (
 type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
-	// -- Creates a new business with a specified name and owner ID, returning the new record.
-	// -- name: CreateBusiness :one
-	// INSERT INTO businesses (
-	//     name,
-	//     owner_id
-	// ) VALUES (
-	//     $1, $2
-	// )
-	// RETURNING *;
-	//
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
@@ -33,6 +23,8 @@ type Querier interface {
 	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Retrieves a single business record by its unique ID.
 	GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error)
+	// GetBusinessMembers returns all the particular business members
+	GetBusinessMembers(ctx context.Context, businessID pgtype.UUID) ([]GetBusinessMembersRow, error)
 	// Retrieves all businesses owned by a specific user ID.
 	GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]Business, error)
 	// Retrieves all businesses a user is a member of, including their role and balance in each.
@@ -46,6 +38,8 @@ type Querier interface {
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
 	// InsertRefreshToken inserts a new refresh token into the database.
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
+	// returns 1 if a user is a member of the given businessId
+	IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOfBusinessParams) (int32, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	// -- name: UpsertUserByEmail :one

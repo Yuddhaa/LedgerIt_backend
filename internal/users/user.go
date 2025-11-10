@@ -31,5 +31,6 @@ func (h *Handler) Routes() chi.Router {
 	// All routes in this package are protected and require a valid JWT.
 	// The '/me' route refers to the authenticated user.
 	r.Put("/me", h.UpdateUserProfileHandler)
+	r.Get("/{phone_no}", h.GetUserByPhone)
 	return r
 }
