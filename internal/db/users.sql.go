@@ -11,32 +11,13 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const createUser = `-- name: CreateUser :one
-INSERT INTO users (
-    google_id,
-    email,
-    name,
-    picture
-) VALUES (
-    $1, $2, $3, $4
-)
-RETURNING id, name, email, phone_number, google_id, picture, created_at, updated_at
+const getUserByEmail = `-- name: GetUserByEmail :one
+SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users
+WHERE email = $1
 `
 
-type CreateUserParams struct {
-	GoogleID string      `json:"google_id"`
-	Email    string      `json:"email"`
-	Name     pgtype.Text `json:"name"`
-	Picture  pgtype.Text `json:"picture"`
-}
-
-func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, error) {
-	row := q.db.QueryRow(ctx, createUser,
-		arg.GoogleID,
-		arg.Email,
-		arg.Name,
-		arg.Picture,
-	)
+func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
+	row := q.db.QueryRow(ctx, getUserByEmail, email)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -51,13 +32,13 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 	return i, err
 }
 
-const getUserByEmail = `-- name: GetUserByEmail :one
+const getUserById = `-- name: GetUserById :one
 SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users
-WHERE email = $1
+WHERE id = $1
 `
 
-func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error) {
-	row := q.db.QueryRow(ctx, getUserByEmail, email)
+func (q *Queries) GetUserById(ctx context.Context, id pgtype.UUID) (User, error) {
+	row := q.db.QueryRow(ctx, getUserById, id)
 	var i User
 	err := row.Scan(
 		&i.ID,
@@ -161,9 +142,6 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 }
 
 const upsertUserByEmail = `-- name: UpsertUserByEmail :one
-
-
-
 WITH inserted AS (
   INSERT INTO users (google_id, email, name, picture)
   VALUES ($1, $2, $3, $4)
@@ -194,38 +172,6 @@ type UpsertUserByEmailRow struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
-// -- name: UpsertUserByEmail :one
-// WITH inserted AS (
-//
-//	INSERT INTO users (google_id, email, name)
-//	VALUES ($1, $2, $3)
-//	ON CONFLICT (email) DO NOTHING
-//	RETURNING *
-//
-// )
-// SELECT * FROM inserted
-// UNION ALL
-// SELECT * FROM users WHERE email = $2
-// LIMIT 1;
-// -- name: UpsertUserByEmail :one
-// WITH inserted AS (
-//
-//	INSERT INTO users (google_id, email, name,picture)
-//	VALUES ($1, $2, $3, $4)
-//	ON CONFLICT (email) DO NOTHING
-//	RETURNING id
-//
-// )
-// SELECT u.*
-// FROM users AS u
-// WHERE u.id IN (
-//
-//	SELECT i.id FROM inserted AS i
-//	UNION
-//	SELECT u2.id FROM users AS u2 WHERE u2.email = $2
-//
-// )
-// LIMIT 1;
 func (q *Queries) UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error) {
 	row := q.db.QueryRow(ctx, upsertUserByEmail,
 		arg.GoogleID,

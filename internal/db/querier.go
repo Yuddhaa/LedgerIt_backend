@@ -14,7 +14,6 @@ type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
-	CreateUser(ctx context.Context, arg CreateUserParams) (User, error)
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
 	// This is used for logging out a single device.
 	DeleteRefreshTokenByHash(ctx context.Context, tokenHash string) error
@@ -35,6 +34,7 @@ type Querier interface {
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
+	GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
 	// InsertRefreshToken inserts a new refresh token into the database.
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
@@ -42,32 +42,6 @@ type Querier interface {
 	IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOfBusinessParams) (int32, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
-	// -- name: UpsertUserByEmail :one
-	// WITH inserted AS (
-	//   INSERT INTO users (google_id, email, name)
-	//   VALUES ($1, $2, $3)
-	//   ON CONFLICT (email) DO NOTHING
-	//   RETURNING *
-	// )
-	// SELECT * FROM inserted
-	// UNION ALL
-	// SELECT * FROM users WHERE email = $2
-	// LIMIT 1;
-	// -- name: UpsertUserByEmail :one
-	// WITH inserted AS (
-	//   INSERT INTO users (google_id, email, name,picture)
-	//   VALUES ($1, $2, $3, $4)
-	//   ON CONFLICT (email) DO NOTHING
-	//   RETURNING id
-	// )
-	// SELECT u.*
-	// FROM users AS u
-	// WHERE u.id IN (
-	//   SELECT i.id FROM inserted AS i
-	//   UNION
-	//   SELECT u2.id FROM users AS u2 WHERE u2.email = $2
-	// )
-	// LIMIT 1;
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
 }
 

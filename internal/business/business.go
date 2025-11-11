@@ -41,8 +41,9 @@ func (h *Handler) Routes() chi.Router {
 	// Routes that require a business ID
 	r.Route("/{id}", func(r chi.Router) {
 		r.Get("/", h.GetBusinessHandler)
-		r.Post("/add", h.AddMemberHandler)
+		r.Post("/members", h.AddMemberHandler)
 		r.Get("/members", h.GetBusinessMembers)
+		r.Get("/balance", h.GetBalance)
 	})
 	return r
 }

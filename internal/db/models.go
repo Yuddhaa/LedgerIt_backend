@@ -97,6 +97,133 @@ func (ns NullBusinessRole) Value() (driver.Value, error) {
 	return string(ns.BusinessRole), nil
 }
 
+type PartyType string
+
+const (
+	PartyTypeCustomer PartyType = "customer"
+	PartyTypeSupplier PartyType = "supplier"
+)
+
+func (e *PartyType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PartyType(s)
+	case string:
+		*e = PartyType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PartyType: %T", src)
+	}
+	return nil
+}
+
+type NullPartyType struct {
+	PartyType PartyType `json:"party_type"`
+	Valid     bool      `json:"valid"` // Valid is true if PartyType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPartyType) Scan(value interface{}) error {
+	if value == nil {
+		ns.PartyType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PartyType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPartyType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PartyType), nil
+}
+
+type TransactionDirection string
+
+const (
+	TransactionDirectionIn  TransactionDirection = "in"
+	TransactionDirectionOut TransactionDirection = "out"
+)
+
+func (e *TransactionDirection) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TransactionDirection(s)
+	case string:
+		*e = TransactionDirection(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TransactionDirection: %T", src)
+	}
+	return nil
+}
+
+type NullTransactionDirection struct {
+	TransactionDirection TransactionDirection `json:"transaction_direction"`
+	Valid                bool                 `json:"valid"` // Valid is true if TransactionDirection is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTransactionDirection) Scan(value interface{}) error {
+	if value == nil {
+		ns.TransactionDirection, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TransactionDirection.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTransactionDirection) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TransactionDirection), nil
+}
+
+type TransactionMode string
+
+const (
+	TransactionModeOnline TransactionMode = "online"
+	TransactionModeCheck  TransactionMode = "check"
+	TransactionModeCash   TransactionMode = "cash"
+)
+
+func (e *TransactionMode) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TransactionMode(s)
+	case string:
+		*e = TransactionMode(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TransactionMode: %T", src)
+	}
+	return nil
+}
+
+type NullTransactionMode struct {
+	TransactionMode TransactionMode `json:"transaction_mode"`
+	Valid           bool            `json:"valid"` // Valid is true if TransactionMode is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTransactionMode) Scan(value interface{}) error {
+	if value == nil {
+		ns.TransactionMode, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TransactionMode.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTransactionMode) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TransactionMode), nil
+}
+
 type Business struct {
 	ID        pgtype.UUID        `json:"id"`
 	Name      string             `json:"name"`
@@ -114,6 +241,16 @@ type BusinessMember struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
+type Party struct {
+	ID          pgtype.UUID        `json:"id"`
+	Name        string             `json:"name"`
+	Type        PartyType          `json:"type"`
+	PhoneNumber pgtype.Text        `json:"phone_number"`
+	BusinessID  pgtype.UUID        `json:"business_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
 type RefreshToken struct {
 	ID         pgtype.UUID        `json:"id"`
 	UserID     pgtype.UUID        `json:"user_id"`
@@ -121,6 +258,18 @@ type RefreshToken struct {
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 	DeviceInfo pgtype.Text        `json:"device_info"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type Transaction struct {
+	ID          pgtype.UUID              `json:"id"`
+	BusinessID  pgtype.UUID              `json:"business_id"`
+	Amount      pgtype.Numeric           `json:"amount"`
+	Description pgtype.Text              `json:"description"`
+	PartyID     pgtype.UUID              `json:"party_id"`
+	Mode        NullTransactionMode      `json:"mode"`
+	Direction   NullTransactionDirection `json:"direction"`
+	CreatedAt   pgtype.Timestamptz       `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz       `json:"updated_at"`
 }
 
 type User struct {
