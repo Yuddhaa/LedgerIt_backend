@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net/http"
 
+	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
@@ -19,7 +20,7 @@ func (h *Handler) GetBusinessMembers(w http.ResponseWriter, r *http.Request) {
 		Members []db.GetBusinessMembersRow `json:"members"`
 	}
 
-	user_uuid, ok := h.getUserIDFromContext(w, r)
+	userId, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return // res and err is already sent in above func
 	}
@@ -32,10 +33,7 @@ func (h *Handler) GetBusinessMembers(w http.ResponseWriter, r *http.Request) {
 
 	// check if the user is a member of the business
 	_, err = h.db.IsUserMemberOfBusiness(r.Context(), db.IsUserMemberOfBusinessParams{
-		UserID: pgtype.UUID{
-			Bytes: user_uuid,
-			Valid: user_uuid != uuid.Nil,
-		},
+		UserID: userId,
 		BusinessID: pgtype.UUID{
 			Bytes: business_uuid,
 			Valid: business_uuid != uuid.Nil,

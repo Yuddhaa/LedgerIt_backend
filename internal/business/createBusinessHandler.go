@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
-
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CreateBusinessHandler creates a new business and automatically adds
@@ -28,18 +26,15 @@ func (h *Handler) CreateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	// extract userId from r.context
-	userId, ok := h.getUserIDFromContext(w, r)
+	userUuid, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return // error and response already sent in that helper func
 	}
 
 	// create business add the member owner in business_members
 	business, err := h.db.CreateBusinessAndAddOwner(r.Context(), db.CreateBusinessAndAddOwnerParams{
-		POwnerID: pgtype.UUID{
-			Bytes: userId,
-			Valid: userId != uuid.Nil,
-		},
-		PName: body.Name,
+		POwnerID: userUuid,
+		PName:    body.Name,
 	})
 	if err != nil {
 		// CHANGED: Don't leak DB error. Use structured logging.
@@ -49,7 +44,7 @@ func (h *Handler) CreateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// ADDED: Log successful creation
-	helpers.LogInfo("CreateBusinessHandler", "business created successfully", "business_id", business.ID, "user_id", userId)
+	helpers.LogInfo("CreateBusinessHandler", "business created successfully", "business_id", business.ID, "user_id", userUuid)
 	helpers.RespondWithJSON(w, 201, resType{
 		Business: business,
 	})

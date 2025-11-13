@@ -8,7 +8,6 @@ import (
 	"LedgerIt/internal/helpers"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -27,30 +26,34 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ---------------------------------------------------------------------------------------------------
-	// 1. Get Claims from context
-	claims, ok := GetClaimsFromContext(r.Context())
+	// // 1. Get Claims from context
+	// claims, ok := GetClaimsFromContext(r.Context())
+	// if !ok {
+	// 	helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve claims from context")
+	// 	// CHANGED: This is a server error; the middleware should guarantee claims.
+	// 	helpers.LogError("LogoutAllHandler", "could not retrieve claims from context")
+	// 	return
+	// }
+	//
+	// // ---------------------------------------------------------------------------------------------------
+	// // 2. Prepare all data *before* the transaction
+	//
+	// // Get User ID and convert
+	// userId := claims.UserId
+	// userUuid, err := uuid.Parse(userId)
+	// if err != nil {
+	// 	helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+	// 	// CHANGED: This is a critical server error; claims are malformed.
+	// 	helpers.LogError("LogoutAllHandler", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
+	// 	return
+	// }
+	// pgTypeUuid := pgtype.UUID{
+	// 	Bytes: userUuid,
+	// 	Valid: userUuid != uuid.Nil,
+	// }
+	pgTypeUuid, ok := GetUserIdFromContext(w, r)
 	if !ok {
-		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve claims from context")
-		// CHANGED: This is a server error; the middleware should guarantee claims.
-		helpers.LogError("LogoutAllHandler", "could not retrieve claims from context")
 		return
-	}
-
-	// ---------------------------------------------------------------------------------------------------
-	// 2. Prepare all data *before* the transaction
-
-	// Get User ID and convert
-	userId := claims.UserId
-	userUuid, err := uuid.Parse(userId)
-	if err != nil {
-		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		// CHANGED: This is a critical server error; claims are malformed.
-		helpers.LogError("LogoutAllHandler", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
-		return
-	}
-	pgTypeUuid := pgtype.UUID{
-		Bytes: userUuid,
-		Valid: userUuid != uuid.Nil,
 	}
 
 	// Generate the new refresh token

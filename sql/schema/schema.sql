@@ -57,14 +57,17 @@ CREATE INDEX idx_business_members_business_id ON business_members(business_id);
 CREATE TABLE parties (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    place TEXT,
+    place TEXT NOT NULL,
     ph_no TEXT,
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- Indexes
 CREATE INDEX idx_parties_business_id ON parties(business_id);
+CREATE INDEX idx_parties_place ON parties(place);
+CREATE INDEX idx_parties_business_id_place ON parties(business_id, place);
 
 -- transaction ENUM types
 CREATE TYPE transaction_direction AS ENUM ('in', 'out');

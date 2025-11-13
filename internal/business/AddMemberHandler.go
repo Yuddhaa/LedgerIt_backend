@@ -1,11 +1,13 @@
 package business
 
 import (
-	"LedgerIt/internal/db"
-	"LedgerIt/internal/helpers"
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"LedgerIt/internal/auth"
+	"LedgerIt/internal/db"
+	"LedgerIt/internal/helpers"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -32,13 +34,17 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 1. Get Requestor's ID
-	requestorId, ok := h.getUserIDFromContext(w, r)
+	// requestorId, ok := h.getUserIDFromContext(w, r)
+	// if !ok {
+	// 	return // error and response already sent
+	// }
+	// requestorUuid := pgtype.UUID{
+	// 	Bytes: requestorId,
+	// 	Valid: requestorId != uuid.Nil,
+	// }
+	requestorUuid, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
-		return // error and response already sent
-	}
-	requestorUuid := pgtype.UUID{
-		Bytes: requestorId,
-		Valid: requestorId != uuid.Nil,
+		return
 	}
 
 	// Get Business ID from URL

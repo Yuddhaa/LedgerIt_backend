@@ -3,11 +3,9 @@ package business
 import (
 	"net/http"
 
+	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
-
-	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // GetAllBusinessHandler returns a list of all businesses that a user is a member of.
@@ -17,14 +15,11 @@ func (h *Handler) GetAllBusinessHandler(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// extract userId from r.context
-	userId, ok := h.getUserIDFromContext(w, r)
+	userId, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return // error and response already sent in that helper func
 	}
-	business, err := h.db.GetBusinessesByUserID(r.Context(), pgtype.UUID{
-		Bytes: userId,
-		Valid: userId != uuid.Nil,
-	})
+	business, err := h.db.GetBusinessesByUserID(r.Context(), userId)
 	if err != nil {
 		// CHANGED: Don't leak DB error. Use structured logging.
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")

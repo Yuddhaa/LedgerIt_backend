@@ -1,10 +1,12 @@
 package business
 
 import (
-	"LedgerIt/internal/db"
-	"LedgerIt/internal/helpers"
 	"errors"
 	"net/http"
+
+	"LedgerIt/internal/auth"
+	"LedgerIt/internal/db"
+	"LedgerIt/internal/helpers"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -20,7 +22,7 @@ func (h *Handler) GetBusinessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// extract userId from r.context
-	userId, ok := h.getUserIDFromContext(w, r)
+	userId, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return // error and response already sent in that helper func
 	}
@@ -35,10 +37,7 @@ func (h *Handler) GetBusinessHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	business, err := h.db.GetBusinessByID(r.Context(), db.GetBusinessByIDParams{
-		UserID: pgtype.UUID{
-			Bytes: userId,
-			Valid: userId != uuid.Nil,
-		},
+		UserID: userId,
 		ID: pgtype.UUID{
 			Bytes: businessId,
 			Valid: businessId != uuid.Nil,

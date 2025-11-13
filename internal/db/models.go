@@ -257,7 +257,7 @@ type Deposit struct {
 type Party struct {
 	ID         pgtype.UUID        `json:"id"`
 	Name       string             `json:"name"`
-	Place      pgtype.Text        `json:"place"`
+	Place      string             `json:"place"`
 	PhNo       pgtype.Text        `json:"ph_no"`
 	BusinessID pgtype.UUID        `json:"business_id"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`

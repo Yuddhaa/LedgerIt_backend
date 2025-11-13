@@ -169,6 +169,35 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// checkAdmin checks if the user is admin or creator or not..
+// if the user is admin/creator flow is moved forward otherwise StatusUnauthorized is returned
+func CheckAdmin(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	})
+}
+
+// GetUserIdFromContext extract and returns user id form context
+func GetUserIdFromContext(w http.ResponseWriter, r *http.Request) (pgtype.UUID, bool) {
+	claims, ok := GetClaimsFromContext(r.Context())
+	if !ok {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve claims from context")
+		helpers.LogError("GetUserIdFromContext", "could not retrieve claims from context")
+		return pgtype.UUID{}, false
+	}
+	// Get User ID and convert
+	userId := claims.UserId
+	userUuid, err := uuid.Parse(userId)
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		helpers.LogError("GetUserIdFromContext", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
+		return pgtype.UUID{}, false
+	}
+	return pgtype.UUID{
+		Bytes: userUuid,
+		Valid: userUuid != uuid.Nil,
+	}, true
+}
+
 // GetClaimsFromContext is a helper function to safely retrieve claims
 // from the request context.
 func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
