@@ -142,8 +142,9 @@ func (ns NullPartyType) Value() (driver.Value, error) {
 type TransactionDirection string
 
 const (
-	TransactionDirectionIn  TransactionDirection = "in"
-	TransactionDirectionOut TransactionDirection = "out"
+	TransactionDirectionIn      TransactionDirection = "in"
+	TransactionDirectionOut     TransactionDirection = "out"
+	TransactionDirectionDeposit TransactionDirection = "deposit"
 )
 
 func (e *TransactionDirection) Scan(src interface{}) error {
@@ -268,8 +269,27 @@ type Transaction struct {
 	PartyID     pgtype.UUID              `json:"party_id"`
 	Mode        NullTransactionMode      `json:"mode"`
 	Direction   NullTransactionDirection `json:"direction"`
+	CategoryID  pgtype.Int4              `json:"category_id"`
 	CreatedAt   pgtype.Timestamptz       `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz       `json:"updated_at"`
+}
+
+type TransactionCategory struct {
+	ID         int32       `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+	Name       string      `json:"name"`
+}
+
+type TransactionEditRequest struct {
+	ID               pgtype.UUID        `json:"id"`
+	TransactionID    pgtype.UUID        `json:"transaction_id"`
+	RequestedByID    pgtype.UUID        `json:"requested_by_id"`
+	ReviewedByID     pgtype.UUID        `json:"reviewed_by_id"`
+	Status           ApprovalStatus     `json:"status"`
+	RequestedChanges []byte             `json:"requested_changes"`
+	Reason           pgtype.Text        `json:"reason"`
+	CreatedAt        pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
 }
 
 type User struct {

@@ -32,7 +32,7 @@ CREATE TYPE approval_status AS ENUM ('pending', 'approved', 'rejected');
 -- --- NEW ENUM Types (from 011, 012, 013, 014) ---
 CREATE TYPE party_type AS ENUM ('customer', 'supplier');
 CREATE TYPE transaction_mode AS ENUM ('online', 'check', 'cash'); -- Renamed from expense_mode
-CREATE TYPE transaction_direction AS ENUM ('in', 'out'); -- Added in 014
+CREATE TYPE transaction_direction AS ENUM ('in', 'out','deposit'); -- Added in 014
 
 
 -- --- Your 'businesses' Table ---
@@ -70,6 +70,7 @@ CREATE TABLE parties (
     name TEXT NOT NULL,
     type party_type NOT NULL,
     phone_number TEXT,
+    place TEXT,
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -96,6 +97,7 @@ CREATE TABLE transactions (
     -- Column added in 014
     direction transaction_direction,
 
+    category_id INT REFERENCES transaction_categories(id) ON DELETE SET NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -104,6 +106,35 @@ CREATE TABLE transactions (
 CREATE INDEX idx_transactions_party_id ON transactions(party_id);
 -- Index (Added in 014)
 CREATE INDEX idx_transactions_direction ON transactions(direction);
+
+-- --- 'transaction_categories' Table (Added from 015) ---
+CREATE TABLE transaction_categories (
+    id SERIAL PRIMARY KEY,
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    
+    -- A category name should be unique within a business
+    CONSTRAINT unique_business_transaction_category_name UNIQUE (business_id, name)
+);
+
+CREATE INDEX idx_transaction_categories_business_id ON transaction_categories(business_id);
+
+-- --- 'transaction_edit_requests' Table (Added from 015) ---
+CREATE TABLE transaction_edit_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    requested_by_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    reviewed_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    status approval_status NOT NULL DEFAULT 'pending',
+    -- JSONB is efficient for storing the proposed changes
+    requested_changes JSONB NOT NULL,
+    reason TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_transaction_edit_requests_transaction_id ON transaction_edit_requests(transaction_id);
+CREATE INDEX idx_transaction_edit_requests_status ON transaction_edit_requests(status);
 
 
 -- --- Your Functions ---

@@ -1,6 +1,6 @@
 -- +goose Up
 -- Create the new ENUM type for transaction direction
-CREATE TYPE transaction_direction AS ENUM ('in', 'out');
+CREATE TYPE transaction_direction AS ENUM ('in', 'out','deposit');
 
 -- Add the new direction column to the transactions table, making it nullable
 ALTER TABLE transactions

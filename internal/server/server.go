@@ -9,6 +9,7 @@ import (
 	"LedgerIt/internal/business"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
+	"LedgerIt/internal/transactions"
 	"LedgerIt/internal/users"
 
 	"github.com/go-chi/chi/v5"
@@ -70,6 +71,7 @@ func (s *Server) setupRouter() {
 	}
 	userHandler := users.NewHandler(s.db, s.pool, s.logger)
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
+	transactionsHandler := transactions.NewHandler(s.db, s.pool)
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -91,6 +93,7 @@ func (s *Server) setupRouter() {
 
 		r.Mount("/api/v1/users/", userHandler.Routes())
 		r.Mount("/api/v1/business/", businessHandler.Routes())
+		r.Mount("/api/v1/business/{id}/transactions", transactionsHandler.Routes())
 	})
 
 	s.Router = r
