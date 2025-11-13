@@ -169,13 +169,6 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// checkAdmin checks if the user is admin or creator or not..
-// if the user is admin/creator flow is moved forward otherwise StatusUnauthorized is returned
-func CheckAdmin(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-	})
-}
-
 // GetUserIdFromContext extract and returns user id form context
 func GetUserIdFromContext(w http.ResponseWriter, r *http.Request) (pgtype.UUID, bool) {
 	claims, ok := GetClaimsFromContext(r.Context())
@@ -195,6 +188,21 @@ func GetUserIdFromContext(w http.ResponseWriter, r *http.Request) (pgtype.UUID, 
 	return pgtype.UUID{
 		Bytes: userUuid,
 		Valid: userUuid != uuid.Nil,
+	}, true
+}
+
+// ExtractUUID extracts uuids from the path variable
+func ExtractUUID(w http.ResponseWriter, r *http.Request, variable string) (pgtype.UUID, bool) {
+	uuidStr := chi.URLParam(r, variable)
+	UUID, err := uuid.Parse(uuidStr)
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url Param")
+		helpers.LogError("ExtractBusinessUUID", "bad url param", "Err", err)
+		return pgtype.UUID{}, false
+	}
+	return pgtype.UUID{
+		Bytes: UUID,
+		Valid: UUID != uuid.Nil,
 	}, true
 }
 

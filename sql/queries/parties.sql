@@ -3,7 +3,7 @@
 INSERT INTO parties (
   name,
   place,
-  ph_no,
+  phone_number,
   business_id
 ) VALUES (
   $1, $2, $3, $4
@@ -16,7 +16,7 @@ UPDATE parties
 SET
   name = $2,
   place = $3,
-  ph_no = $4,
+  phone_number = $4,
   updated_at = now()
 WHERE
   id = $1

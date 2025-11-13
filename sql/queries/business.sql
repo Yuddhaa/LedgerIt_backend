@@ -57,5 +57,10 @@ ORDER BY u.name;
 -- name: IsUserMemberOfBusiness :one
 SELECT 1
 FROM business_members
-WHERE user_id = $1 AND business_id = $2
-LIMIT 1;
+WHERE user_id = $1 AND business_id = $2;
+
+-- returns 1 if a user is admin or creator of a given business_id
+-- name: CheckAdmin :one
+SELECT 1
+FROM business_members
+WHERE user_id = $1 AND business_id = $2 AND role in ('admin', 'creator');

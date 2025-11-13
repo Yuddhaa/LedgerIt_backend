@@ -51,7 +51,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	// 	Bytes: userUuid,
 	// 	Valid: userUuid != uuid.Nil,
 	// }
-	pgTypeUuid, ok := GetUserIdFromContext(w, r)
+	userId, ok := GetUserIdFromContext(w, r)
 	if !ok {
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	qtx := h.db.WithTx(tx)
 
 	// 3a. Delete all old tokens for this user
-	if err := qtx.DeleteRefreshTokensByUserID(r.Context(), pgTypeUuid); err != nil {
+	if err := qtx.DeleteRefreshTokensByUserID(r.Context(), userId); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
 		helpers.LogError("LogoutAllHandler", "error in tx DeleteRefreshTokensByUserID", "error", err, "user_id", userId)
@@ -90,7 +90,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 
 	// 3b. Insert the *one* new token for the current session
 	if _, err := qtx.InsertRefreshToken(r.Context(), db.InsertRefreshTokenParams{
-		UserID:    pgTypeUuid,
+		UserID:    userId,
 		TokenHash: hashedRandStr,
 		ExpiresAt: pgtype.Timestamptz{
 			Time:  time.Now().Add(30 * 24 * time.Hour),
@@ -118,7 +118,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	// ---------------------------------------------------------------------------------------------------
 	// 4. Generate new access token (only after DB success)
 	accessToken, err := GenerateJwt(&Claims{
-		UserId: userId,
+		UserId: h.uuidToString(userId),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "LedgerIt",
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),

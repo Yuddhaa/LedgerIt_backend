@@ -15,19 +15,19 @@ const createParty = `-- name: CreateParty :one
 INSERT INTO parties (
   name,
   place,
-  ph_no,
+  phone_number,
   business_id
 ) VALUES (
   $1, $2, $3, $4
 )
-RETURNING id, name, place, ph_no, business_id, created_at, updated_at
+RETURNING id, name, place, phone_number, business_id, created_at, updated_at
 `
 
 type CreatePartyParams struct {
-	Name       string      `json:"name"`
-	Place      string      `json:"place"`
-	PhNo       pgtype.Text `json:"ph_no"`
-	BusinessID pgtype.UUID `json:"business_id"`
+	Name        string      `json:"name"`
+	Place       string      `json:"place"`
+	PhoneNumber pgtype.Text `json:"phone_number"`
+	BusinessID  pgtype.UUID `json:"business_id"`
 }
 
 // add a party
@@ -35,7 +35,7 @@ func (q *Queries) CreateParty(ctx context.Context, arg CreatePartyParams) (Party
 	row := q.db.QueryRow(ctx, createParty,
 		arg.Name,
 		arg.Place,
-		arg.PhNo,
+		arg.PhoneNumber,
 		arg.BusinessID,
 	)
 	var i Party
@@ -43,7 +43,7 @@ func (q *Queries) CreateParty(ctx context.Context, arg CreatePartyParams) (Party
 		&i.ID,
 		&i.Name,
 		&i.Place,
-		&i.PhNo,
+		&i.PhoneNumber,
 		&i.BusinessID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -63,7 +63,7 @@ func (q *Queries) DeleteParty(ctx context.Context, id pgtype.UUID) error {
 }
 
 const getParty = `-- name: GetParty :one
-SELECT id, name, place, ph_no, business_id, created_at, updated_at FROM parties
+SELECT id, name, place, phone_number, business_id, created_at, updated_at FROM parties
 WHERE id = $1
 `
 
@@ -75,7 +75,7 @@ func (q *Queries) GetParty(ctx context.Context, id pgtype.UUID) (Party, error) {
 		&i.ID,
 		&i.Name,
 		&i.Place,
-		&i.PhNo,
+		&i.PhoneNumber,
 		&i.BusinessID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -84,7 +84,7 @@ func (q *Queries) GetParty(ctx context.Context, id pgtype.UUID) (Party, error) {
 }
 
 const listPartiesByBusiness = `-- name: ListPartiesByBusiness :many
-SELECT id, name, place, ph_no, business_id, created_at, updated_at FROM parties
+SELECT id, name, place, phone_number, business_id, created_at, updated_at FROM parties
 WHERE business_id = $1
 ORDER BY created_at DESC
 `
@@ -103,7 +103,7 @@ func (q *Queries) ListPartiesByBusiness(ctx context.Context, businessID pgtype.U
 			&i.ID,
 			&i.Name,
 			&i.Place,
-			&i.PhNo,
+			&i.PhoneNumber,
 			&i.BusinessID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -119,7 +119,7 @@ func (q *Queries) ListPartiesByBusiness(ctx context.Context, businessID pgtype.U
 }
 
 const listPartiesByBusinessAndPlace = `-- name: ListPartiesByBusinessAndPlace :many
-SELECT id, name, place, ph_no, business_id, created_at, updated_at FROM parties
+SELECT id, name, place, phone_number, business_id, created_at, updated_at FROM parties
 WHERE business_id = $1 AND place = $2
 ORDER BY created_at DESC
 `
@@ -143,7 +143,7 @@ func (q *Queries) ListPartiesByBusinessAndPlace(ctx context.Context, arg ListPar
 			&i.ID,
 			&i.Name,
 			&i.Place,
-			&i.PhNo,
+			&i.PhoneNumber,
 			&i.BusinessID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -191,18 +191,18 @@ UPDATE parties
 SET
   name = $2,
   place = $3,
-  ph_no = $4,
+  phone_number = $4,
   updated_at = now()
 WHERE
   id = $1
-RETURNING id, name, place, ph_no, business_id, created_at, updated_at
+RETURNING id, name, place, phone_number, business_id, created_at, updated_at
 `
 
 type UpdatePartyParams struct {
-	ID    pgtype.UUID `json:"id"`
-	Name  string      `json:"name"`
-	Place string      `json:"place"`
-	PhNo  pgtype.Text `json:"ph_no"`
+	ID          pgtype.UUID `json:"id"`
+	Name        string      `json:"name"`
+	Place       string      `json:"place"`
+	PhoneNumber pgtype.Text `json:"phone_number"`
 }
 
 // update a particular party
@@ -211,14 +211,14 @@ func (q *Queries) UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party
 		arg.ID,
 		arg.Name,
 		arg.Place,
-		arg.PhNo,
+		arg.PhoneNumber,
 	)
 	var i Party
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Place,
-		&i.PhNo,
+		&i.PhoneNumber,
 		&i.BusinessID,
 		&i.CreatedAt,
 		&i.UpdatedAt,

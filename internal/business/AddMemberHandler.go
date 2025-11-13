@@ -71,12 +71,12 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 		if errors.Is(err, pgx.ErrNoRows) {
 			helpers.RespondWithError(w, http.StatusForbidden, "Access denied")
 			// ADDED: Log the failed authz check
-			helpers.LogInfo("AddMemberHandler", "authz failed: requestor not a member", "requestor_id", requestorId, "business_id", businessId)
+			helpers.LogInfo("AddMemberHandler", "authz failed: requestor not a member", "requestor_id", requestorUuid, "business_id", businessId)
 			return
 		}
 		// Any other error is a real 500
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("AddMemberHandler", "db error in GetMemberRole", "error", err, "requestor_id", requestorId)
+		helpers.LogError("AddMemberHandler", "db error in GetMemberRole", "error", err, "requestor_id", requestorUuid)
 		return
 	}
 
@@ -84,7 +84,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if role != db.BusinessRoleCreator && role != db.BusinessRoleAdmin {
 		helpers.RespondWithError(w, http.StatusForbidden, "Not authorized to add members")
 		// ADDED: Log the failed authz check
-		helpers.LogInfo("AddMemberHandler", "authz failed: insufficient role", "requestor_id", requestorId, "role", role)
+		helpers.LogInfo("AddMemberHandler", "authz failed: insufficient role", "requestor_id", requestorUuid, "role", role)
 		return
 	}
 	// -------------------------------------------------------------------------------
@@ -119,7 +119,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ADDED: Log successful add
-	helpers.LogInfo("AddMemberHandler", "member added successfully", "new_user_id", newUserId, "business_id", businessId, "added_by", requestorId)
+	helpers.LogInfo("AddMemberHandler", "member added successfully", "new_user_id", newUserId, "business_id", businessId, "added_by", requestorUuid)
 	helpers.RespondWithJSON(w, 201, resType{
 		Member: member,
 	})

@@ -43,6 +43,25 @@ func (q *Queries) AddBusinessMember(ctx context.Context, arg AddBusinessMemberPa
 	return i, err
 }
 
+const checkAdmin = `-- name: CheckAdmin :one
+SELECT 1
+FROM business_members
+WHERE user_id = $1 AND business_id = $2 AND role in ('admin', 'creator')
+`
+
+type CheckAdminParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// returns 1 if a user is admin or creator of a given business_id
+func (q *Queries) CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error) {
+	row := q.db.QueryRow(ctx, checkAdmin, arg.UserID, arg.BusinessID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createBusinessAndAddOwner = `-- name: CreateBusinessAndAddOwner :one
 SELECT id, name, owner_id, created_at, updated_at FROM create_business_and_add_owner(
     p_owner_id := $1,
@@ -247,7 +266,6 @@ const isUserMemberOfBusiness = `-- name: IsUserMemberOfBusiness :one
 SELECT 1
 FROM business_members
 WHERE user_id = $1 AND business_id = $2
-LIMIT 1
 `
 
 type IsUserMemberOfBusinessParams struct {

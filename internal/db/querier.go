@@ -13,6 +13,8 @@ import (
 type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
+	// returns 1 if a user is admin or creator of a given business_id
+	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)

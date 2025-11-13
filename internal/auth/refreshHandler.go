@@ -1,7 +1,6 @@
 package auth
 
 import (
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -11,6 +10,7 @@ import (
 	"LedgerIt/internal/helpers"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -55,7 +55,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. GET: Find the token. This can happen *before* the transaction.
 	row, err := h.db.GetRefreshTokenByHash(r.Context(), hashedToken)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, pgx.ErrNoRows) {
 			// This is an expected "error" (client token is invalid/not found).
 			helpers.RespondWithError(w, http.StatusUnauthorized, "Unauthorized")
 			helpers.LogInfo("RefreshHandler", "Unauthorized: refresh token not found, expired, or already used")

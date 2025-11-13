@@ -48,7 +48,7 @@ func (h *Handler) GetBusinessMembers(w http.ResponseWriter, r *http.Request) {
 		}
 		// Any other error is a 500
 		helpers.RespondWithError(w, 500, "internal server error during authorization")
-		helpers.LogError("GetBusinessMembers", "IsUserMemberOfBusiness db error", "err", err, "business_uuid", business_uuid, "user_id", user_uuid)
+		helpers.LogError("GetBusinessMembers", "IsUserMemberOfBusiness db error", "err", err, "business_uuid", business_uuid, "user_id", userId)
 		return
 	}
 

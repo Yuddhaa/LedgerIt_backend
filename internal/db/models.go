@@ -255,13 +255,13 @@ type Deposit struct {
 }
 
 type Party struct {
-	ID         pgtype.UUID        `json:"id"`
-	Name       string             `json:"name"`
-	Place      string             `json:"place"`
-	PhNo       pgtype.Text        `json:"ph_no"`
-	BusinessID pgtype.UUID        `json:"business_id"`
-	CreatedAt  pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
+	ID          pgtype.UUID        `json:"id"`
+	Name        string             `json:"name"`
+	Place       string             `json:"place"`
+	PhoneNumber pgtype.Text        `json:"phone_number"`
+	BusinessID  pgtype.UUID        `json:"business_id"`
+	CreatedAt   pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RefreshToken struct {
