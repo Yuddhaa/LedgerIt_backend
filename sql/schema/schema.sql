@@ -1,20 +1,19 @@
 -- This extension is needed for gen_random_uuid()
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- This is a placeholder for your actual 'users' table.
--- sqlc needs this to understand the foreign key references.
--- Make sure this matches your real 'users' migration.
+-- Create the foundational users table
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT,
     email TEXT UNIQUE NOT NULL,
-    phone_number TEXT,
+    phone_number TEXT UNIQUE,
     google_id TEXT UNIQUE NOT NULL,
     picture TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+-- refresh_tokens table
 CREATE TABLE refresh_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -24,18 +23,11 @@ CREATE TABLE refresh_tokens (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- --- Your ENUM Types ---
+CREATE INDEX idx_refresh_tokens_user_id ON refresh_tokens(user_id);
+CREATE INDEX idx_refresh_tokens_token_hash ON refresh_tokens(token_hash);
 
+-- business tables, types, and functions
 CREATE TYPE business_role AS ENUM ('creator', 'admin', 'employee');
-CREATE TYPE approval_status AS ENUM ('pending', 'approved', 'rejected');
-
--- --- NEW ENUM Types (from 011, 012, 013, 014) ---
-CREATE TYPE party_type AS ENUM ('customer', 'supplier');
-CREATE TYPE transaction_mode AS ENUM ('online', 'check', 'cash'); -- Renamed from expense_mode
-CREATE TYPE transaction_direction AS ENUM ('in', 'out','deposit'); -- Added in 014
-
-
--- --- Your 'businesses' Table ---
 
 CREATE TABLE businesses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -44,10 +36,7 @@ CREATE TABLE businesses (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
-
 CREATE INDEX idx_businesses_owner_id ON businesses(owner_id);
-
--- --- Your 'business_members' Table ---
 
 CREATE TABLE business_members (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -60,86 +49,103 @@ CREATE TABLE business_members (
     -- A user can only be in one role per business
     CONSTRAINT unique_user_business UNIQUE (user_id, business_id)
 );
-
 CREATE INDEX idx_business_members_user_id ON business_members(user_id);
 CREATE INDEX idx_business_members_business_id ON business_members(business_id);
 
--- --- 'parties' Table (from 011) ---
+
+-- parties table
 CREATE TABLE parties (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name TEXT NOT NULL,
-    type party_type NOT NULL,
-    phone_number TEXT,
     place TEXT,
+    ph_no TEXT,
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_parties_business_id ON parties(business_id);
-CREATE INDEX idx_parties_phone_number ON parties(phone_number);
-CREATE INDEX idx_parties_type ON parties(type);
 
--- --- 'transactions' Table (Renamed from 'expenses' in 013) ---
--- NOTE: The 'expenses' table was not provided in the original schema.
--- This is an assumed structure based on the request to add columns.
--- Your actual 'expenses' table migration should come before 012.
-CREATE TABLE transactions (
+-- transaction ENUM types
+CREATE TYPE transaction_direction AS ENUM ('in', 'out');
+CREATE TYPE transaction_mode AS ENUM ('online', 'cash', 'cheque');
+CREATE TYPE edit_request_status AS ENUM ('pending', 'approved', 'rejected');
+CREATE TYPE deposit_status AS ENUM ('pending', 'approved', 'rejected');
+
+-- transaction_categories table
+CREATE TABLE transaction_categories (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
-    amount DECIMAL(10, 2) NOT NULL,
-    description TEXT,
-    
-    -- Columns added in 012
-    party_id UUID REFERENCES parties(id) ON DELETE SET NULL,
-    mode transaction_mode, -- Renamed from expense_mode
-    
-    -- Column added in 014
-    direction transaction_direction,
-
-    category_id INT REFERENCES transaction_categories(id) ON DELETE SET NULL,
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
--- Index (Renamed in 013)
-CREATE INDEX idx_transactions_party_id ON transactions(party_id);
--- Index (Added in 014)
-CREATE INDEX idx_transactions_direction ON transactions(direction);
-
--- --- 'transaction_categories' Table (Added from 015) ---
-CREATE TABLE transaction_categories (
-    id SERIAL PRIMARY KEY,
-    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    
-    -- A category name should be unique within a business
-    CONSTRAINT unique_business_transaction_category_name UNIQUE (business_id, name)
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT unique_business_category_name UNIQUE (business_id, name)
 );
 
 CREATE INDEX idx_transaction_categories_business_id ON transaction_categories(business_id);
 
--- --- 'transaction_edit_requests' Table (Added from 015) ---
+-- transactions table
+CREATE TABLE transactions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT, -- User who entered it
+    amount DECIMAL(10, 2) NOT NULL,
+    direction transaction_direction NOT NULL,
+    category_id UUID REFERENCES transaction_categories(id) ON DELETE SET NULL,
+    party_id UUID REFERENCES parties(id) ON DELETE SET NULL,
+    mode transaction_mode NOT NULL,
+    receipt_no TEXT,
+    description TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_transactions_business_id ON transactions(business_id);
+CREATE INDEX idx_transactions_user_id ON transactions(user_id);
+CREATE INDEX idx_transactions_category_id ON transactions(category_id);
+CREATE INDEX idx_transactions_party_id ON transactions(party_id);
+CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
+
+-- transaction_edit_requests table
 CREATE TABLE transaction_edit_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
-    requested_by_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_by_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     reviewed_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
-    status approval_status NOT NULL DEFAULT 'pending',
-    -- JSONB is efficient for storing the proposed changes
-    requested_changes JSONB NOT NULL,
+    status edit_request_status NOT NULL DEFAULT 'pending',
+    requested_changes JSONB NOT NULL, -- JSONB is preferred over JSON
     reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_transaction_edit_requests_transaction_id ON transaction_edit_requests(transaction_id);
+CREATE INDEX idx_transaction_edit_requests_requested_by_id ON transaction_edit_requests(requested_by_id);
+CREATE INDEX idx_transaction_edit_requests_reviewed_by_id ON transaction_edit_requests(reviewed_by_id);
 CREATE INDEX idx_transaction_edit_requests_status ON transaction_edit_requests(status);
 
+-- deposits table
+CREATE TABLE deposits (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+    depositer_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
+    amount DECIMAL(10, 2) NOT NULL,
+    remarks TEXT,
+    status deposit_status NOT NULL DEFAULT 'pending',
+    reviewer_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
--- --- Your Functions ---
--- (This is the same function from your migration,
--- so sqlc can understand its arguments and return type)
+CREATE INDEX idx_deposits_business_id ON deposits(business_id);
+CREATE INDEX idx_deposits_depositer_id ON deposits(depositer_id);
+CREATE INDEX idx_deposits_reviewer_id ON deposits(reviewer_id);
+CREATE INDEX idx_deposits_status ON deposits(status);
+
+
+--- funcitons ---
+
 
 CREATE OR REPLACE FUNCTION create_business_and_add_owner(
     p_owner_id UUID,

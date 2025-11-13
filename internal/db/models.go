@@ -11,49 +11,6 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-type ApprovalStatus string
-
-const (
-	ApprovalStatusPending  ApprovalStatus = "pending"
-	ApprovalStatusApproved ApprovalStatus = "approved"
-	ApprovalStatusRejected ApprovalStatus = "rejected"
-)
-
-func (e *ApprovalStatus) Scan(src interface{}) error {
-	switch s := src.(type) {
-	case []byte:
-		*e = ApprovalStatus(s)
-	case string:
-		*e = ApprovalStatus(s)
-	default:
-		return fmt.Errorf("unsupported scan type for ApprovalStatus: %T", src)
-	}
-	return nil
-}
-
-type NullApprovalStatus struct {
-	ApprovalStatus ApprovalStatus `json:"approval_status"`
-	Valid          bool           `json:"valid"` // Valid is true if ApprovalStatus is not NULL
-}
-
-// Scan implements the Scanner interface.
-func (ns *NullApprovalStatus) Scan(value interface{}) error {
-	if value == nil {
-		ns.ApprovalStatus, ns.Valid = "", false
-		return nil
-	}
-	ns.Valid = true
-	return ns.ApprovalStatus.Scan(value)
-}
-
-// Value implements the driver Valuer interface.
-func (ns NullApprovalStatus) Value() (driver.Value, error) {
-	if !ns.Valid {
-		return nil, nil
-	}
-	return string(ns.ApprovalStatus), nil
-}
-
 type BusinessRole string
 
 const (
@@ -97,54 +54,97 @@ func (ns NullBusinessRole) Value() (driver.Value, error) {
 	return string(ns.BusinessRole), nil
 }
 
-type PartyType string
+type DepositStatus string
 
 const (
-	PartyTypeCustomer PartyType = "customer"
-	PartyTypeSupplier PartyType = "supplier"
+	DepositStatusPending  DepositStatus = "pending"
+	DepositStatusApproved DepositStatus = "approved"
+	DepositStatusRejected DepositStatus = "rejected"
 )
 
-func (e *PartyType) Scan(src interface{}) error {
+func (e *DepositStatus) Scan(src interface{}) error {
 	switch s := src.(type) {
 	case []byte:
-		*e = PartyType(s)
+		*e = DepositStatus(s)
 	case string:
-		*e = PartyType(s)
+		*e = DepositStatus(s)
 	default:
-		return fmt.Errorf("unsupported scan type for PartyType: %T", src)
+		return fmt.Errorf("unsupported scan type for DepositStatus: %T", src)
 	}
 	return nil
 }
 
-type NullPartyType struct {
-	PartyType PartyType `json:"party_type"`
-	Valid     bool      `json:"valid"` // Valid is true if PartyType is not NULL
+type NullDepositStatus struct {
+	DepositStatus DepositStatus `json:"deposit_status"`
+	Valid         bool          `json:"valid"` // Valid is true if DepositStatus is not NULL
 }
 
 // Scan implements the Scanner interface.
-func (ns *NullPartyType) Scan(value interface{}) error {
+func (ns *NullDepositStatus) Scan(value interface{}) error {
 	if value == nil {
-		ns.PartyType, ns.Valid = "", false
+		ns.DepositStatus, ns.Valid = "", false
 		return nil
 	}
 	ns.Valid = true
-	return ns.PartyType.Scan(value)
+	return ns.DepositStatus.Scan(value)
 }
 
 // Value implements the driver Valuer interface.
-func (ns NullPartyType) Value() (driver.Value, error) {
+func (ns NullDepositStatus) Value() (driver.Value, error) {
 	if !ns.Valid {
 		return nil, nil
 	}
-	return string(ns.PartyType), nil
+	return string(ns.DepositStatus), nil
+}
+
+type EditRequestStatus string
+
+const (
+	EditRequestStatusPending  EditRequestStatus = "pending"
+	EditRequestStatusApproved EditRequestStatus = "approved"
+	EditRequestStatusRejected EditRequestStatus = "rejected"
+)
+
+func (e *EditRequestStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = EditRequestStatus(s)
+	case string:
+		*e = EditRequestStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for EditRequestStatus: %T", src)
+	}
+	return nil
+}
+
+type NullEditRequestStatus struct {
+	EditRequestStatus EditRequestStatus `json:"edit_request_status"`
+	Valid             bool              `json:"valid"` // Valid is true if EditRequestStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullEditRequestStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.EditRequestStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.EditRequestStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullEditRequestStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.EditRequestStatus), nil
 }
 
 type TransactionDirection string
 
 const (
-	TransactionDirectionIn      TransactionDirection = "in"
-	TransactionDirectionOut     TransactionDirection = "out"
-	TransactionDirectionDeposit TransactionDirection = "deposit"
+	TransactionDirectionIn  TransactionDirection = "in"
+	TransactionDirectionOut TransactionDirection = "out"
 )
 
 func (e *TransactionDirection) Scan(src interface{}) error {
@@ -186,8 +186,8 @@ type TransactionMode string
 
 const (
 	TransactionModeOnline TransactionMode = "online"
-	TransactionModeCheck  TransactionMode = "check"
 	TransactionModeCash   TransactionMode = "cash"
+	TransactionModeCheque TransactionMode = "cheque"
 )
 
 func (e *TransactionMode) Scan(src interface{}) error {
@@ -242,14 +242,26 @@ type BusinessMember struct {
 	CreatedAt      pgtype.Timestamptz `json:"created_at"`
 }
 
-type Party struct {
+type Deposit struct {
 	ID          pgtype.UUID        `json:"id"`
-	Name        string             `json:"name"`
-	Type        PartyType          `json:"type"`
-	PhoneNumber pgtype.Text        `json:"phone_number"`
 	BusinessID  pgtype.UUID        `json:"business_id"`
+	DepositerID pgtype.UUID        `json:"depositer_id"`
+	Amount      pgtype.Numeric     `json:"amount"`
+	Remarks     pgtype.Text        `json:"remarks"`
+	Status      DepositStatus      `json:"status"`
+	ReviewerID  pgtype.UUID        `json:"reviewer_id"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
+}
+
+type Party struct {
+	ID         pgtype.UUID        `json:"id"`
+	Name       string             `json:"name"`
+	Place      pgtype.Text        `json:"place"`
+	PhNo       pgtype.Text        `json:"ph_no"`
+	BusinessID pgtype.UUID        `json:"business_id"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
 type RefreshToken struct {
@@ -262,22 +274,26 @@ type RefreshToken struct {
 }
 
 type Transaction struct {
-	ID          pgtype.UUID              `json:"id"`
-	BusinessID  pgtype.UUID              `json:"business_id"`
-	Amount      pgtype.Numeric           `json:"amount"`
-	Description pgtype.Text              `json:"description"`
-	PartyID     pgtype.UUID              `json:"party_id"`
-	Mode        NullTransactionMode      `json:"mode"`
-	Direction   NullTransactionDirection `json:"direction"`
-	CategoryID  pgtype.Int4              `json:"category_id"`
-	CreatedAt   pgtype.Timestamptz       `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz       `json:"updated_at"`
+	ID          pgtype.UUID          `json:"id"`
+	BusinessID  pgtype.UUID          `json:"business_id"`
+	UserID      pgtype.UUID          `json:"user_id"`
+	Amount      pgtype.Numeric       `json:"amount"`
+	Direction   TransactionDirection `json:"direction"`
+	CategoryID  pgtype.UUID          `json:"category_id"`
+	PartyID     pgtype.UUID          `json:"party_id"`
+	Mode        TransactionMode      `json:"mode"`
+	ReceiptNo   pgtype.Text          `json:"receipt_no"`
+	Description pgtype.Text          `json:"description"`
+	CreatedAt   pgtype.Timestamptz   `json:"created_at"`
+	UpdatedAt   pgtype.Timestamptz   `json:"updated_at"`
 }
 
 type TransactionCategory struct {
-	ID         int32       `json:"id"`
-	BusinessID pgtype.UUID `json:"business_id"`
-	Name       string      `json:"name"`
+	ID         pgtype.UUID        `json:"id"`
+	BusinessID pgtype.UUID        `json:"business_id"`
+	Name       string             `json:"name"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `json:"updated_at"`
 }
 
 type TransactionEditRequest struct {
@@ -285,7 +301,7 @@ type TransactionEditRequest struct {
 	TransactionID    pgtype.UUID        `json:"transaction_id"`
 	RequestedByID    pgtype.UUID        `json:"requested_by_id"`
 	ReviewedByID     pgtype.UUID        `json:"reviewed_by_id"`
-	Status           ApprovalStatus     `json:"status"`
+	Status           EditRequestStatus  `json:"status"`
 	RequestedChanges []byte             `json:"requested_changes"`
 	Reason           pgtype.Text        `json:"reason"`
 	CreatedAt        pgtype.Timestamptz `json:"created_at"`

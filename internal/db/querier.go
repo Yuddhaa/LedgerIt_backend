@@ -14,20 +14,12 @@ type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
-	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
-	CreateTransaction(ctx context.Context, arg CreateTransactionParams) (Transaction, error)
-	CreateTransactionCategory(ctx context.Context, arg CreateTransactionCategoryParams) (TransactionCategory, error)
-	// --- Transaction Edit Requests ---
-	CreateTransactionEditRequest(ctx context.Context, arg CreateTransactionEditRequestParams) (TransactionEditRequest, error)
-	DeleteParty(ctx context.Context, arg DeletePartyParams) error
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
 	// This is used for logging out a single device.
 	DeleteRefreshTokenByHash(ctx context.Context, tokenHash string) error
 	// DeleteRefreshTokensByUserID deletes all refresh tokens for a specific user.
 	// This is used for the "log out from all devices" feature.
 	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
-	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) error
-	DeleteTransactionCategory(ctx context.Context, arg DeleteTransactionCategoryParams) error
 	// Retrieves a single business record by its unique ID.
 	GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error)
 	// GetBusinessMembers returns all the particular business members
@@ -38,15 +30,9 @@ type Querier interface {
 	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
-	GetParty(ctx context.Context, arg GetPartyParams) (Party, error)
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
-	GetTransaction(ctx context.Context, arg GetTransactionParams) (Transaction, error)
-	GetTransactionCategory(ctx context.Context, arg GetTransactionCategoryParams) (TransactionCategory, error)
-	GetTransactionEditRequest(ctx context.Context, id pgtype.UUID) (TransactionEditRequest, error)
-	// Gets a single transaction with party and category names
-	GetTransactionRich(ctx context.Context, arg GetTransactionRichParams) (GetTransactionRichRow, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
@@ -54,18 +40,7 @@ type Querier interface {
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	// returns 1 if a user is a member of the given businessId
 	IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOfBusinessParams) (int32, error)
-	ListEditRequestsForTransaction(ctx context.Context, transactionID pgtype.UUID) ([]TransactionEditRequest, error)
-	ListParties(ctx context.Context, businessID pgtype.UUID) ([]Party, error)
-	ListPartiesByType(ctx context.Context, arg ListPartiesByTypeParams) ([]Party, error)
-	ListPendingEditRequestsForBusiness(ctx context.Context, businessID pgtype.UUID) ([]TransactionEditRequest, error)
-	ListTransactionCategories(ctx context.Context, businessID pgtype.UUID) ([]TransactionCategory, error)
-	// This query joins parties and categories to get their names
-	ListTransactions(ctx context.Context, arg ListTransactionsParams) ([]ListTransactionsRow, error)
 	ListUsers(ctx context.Context) ([]User, error)
-	UpdateEditRequestStatus(ctx context.Context, arg UpdateEditRequestStatusParams) (TransactionEditRequest, error)
-	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
-	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
-	UpdateTransactionCategory(ctx context.Context, arg UpdateTransactionCategoryParams) (TransactionCategory, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
 }
