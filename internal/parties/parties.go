@@ -48,21 +48,6 @@ func (h *Handler) Routes() chi.Router {
 
 // --- middlerware and helper funcitons
 
-// GetPartyHandler is kind of a helper handler funciton
-// based on the presence of a query parameter this calls the actual handler funcs
-func (h *Handler) GetPartyHandler(w http.ResponseWriter, r *http.Request) {
-	place := r.URL.Query().Get("place")
-
-	if place != "" {
-		// Handle case: GET /?place=...
-		h.GetPlacePartyHandler(w, r)
-		return
-	}
-
-	// Default: GET /
-	h.GetAllPartyHandler(w, r)
-}
-
 // checkAdmin checks if the user is admin or creator or not..
 // if the user is admin/creator flow is moved forward otherwise StatusUnauthorized is returned
 func (h *Handler) CheckAdmin(next http.Handler) http.Handler {

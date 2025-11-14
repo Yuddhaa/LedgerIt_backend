@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func RespondWithJSON(w http.ResponseWriter, code int, payload any) error {
@@ -29,4 +31,13 @@ func AnyToString(payload any, variable *string) error {
 	}
 	*variable = str
 	return nil
+}
+
+// isUniqueViolation is a helper function to check for a PostgreSQL unique_violation error (code 23505).
+func IsUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
 }

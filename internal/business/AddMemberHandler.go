@@ -106,7 +106,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 		Role:       body.Role,
 	})
 	if err != nil {
-		if isUniqueViolation(err) {
+		if helpers.IsUniqueViolation(err) {
 			helpers.RespondWithError(w, http.StatusConflict, "User is already a member of this business")
 			// ADDED: Log the conflict
 			helpers.LogInfo("AddMemberHandler", "conflict: user already a member", "new_user_id", newUserId, "business_id", businessId)

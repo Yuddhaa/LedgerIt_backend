@@ -61,7 +61,8 @@ CREATE TABLE parties (
     phone_number TEXT,
     business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CONSTRAINT unique_party_name_per_business UNIQUE (business_id, name)
 );
 
 -- Indexes

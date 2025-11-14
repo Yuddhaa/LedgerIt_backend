@@ -1,13 +1,11 @@
 package business
 
 import (
-	"errors"
 	"log/slog"
 
 	"LedgerIt/internal/db"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -42,15 +40,4 @@ func (h *Handler) Routes() chi.Router {
 		r.Get("/balance", h.GetBalance)
 	})
 	return r
-}
-
-// --- Internal Helper Functions ---
-
-// isUniqueViolation is a helper function to check for a PostgreSQL unique_violation error (code 23505).
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) {
-		return pgErr.Code == "23505"
-	}
-	return false
 }
