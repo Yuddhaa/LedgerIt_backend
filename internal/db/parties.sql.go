@@ -11,6 +11,26 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const checkMember = `-- name: CheckMember :one
+SELECT 1
+FROM business_members
+WHERE user_id = $1 AND business_id = $2
+LIMIT 1
+`
+
+type CheckMemberParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// returns 1 if a user is a member of a given business_id
+func (q *Queries) CheckMember(ctx context.Context, arg CheckMemberParams) (int32, error) {
+	row := q.db.QueryRow(ctx, checkMember, arg.UserID, arg.BusinessID)
+	var column_1 int32
+	err := row.Scan(&column_1)
+	return column_1, err
+}
+
 const createParty = `-- name: CreateParty :one
 INSERT INTO parties (
   name,
@@ -53,25 +73,36 @@ func (q *Queries) CreateParty(ctx context.Context, arg CreatePartyParams) (Party
 
 const deleteParty = `-- name: DeleteParty :one
 DELETE FROM parties
-WHERE id = $1
+WHERE id = $1 AND business_id = $2
 RETURNING id
 `
 
+type DeletePartyParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
 // delete a particular party
-func (q *Queries) DeleteParty(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
-	row := q.db.QueryRow(ctx, deleteParty, id)
+func (q *Queries) DeleteParty(ctx context.Context, arg DeletePartyParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteParty, arg.ID, arg.BusinessID)
+	var id pgtype.UUID
 	err := row.Scan(&id)
 	return id, err
 }
 
 const getParty = `-- name: GetParty :one
 SELECT id, name, place, phone_number, business_id, created_at, updated_at FROM parties
-WHERE id = $1
+WHERE id = $1 AND business_id = $2
 `
 
+type GetPartyParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
 // get a particular party
-func (q *Queries) GetParty(ctx context.Context, id pgtype.UUID) (Party, error) {
-	row := q.db.QueryRow(ctx, getParty, id)
+func (q *Queries) GetParty(ctx context.Context, arg GetPartyParams) (Party, error) {
+	row := q.db.QueryRow(ctx, getParty, arg.ID, arg.BusinessID)
 	var i Party
 	err := row.Scan(
 		&i.ID,
@@ -196,7 +227,7 @@ SET
   phone_number = $4,
   updated_at = now()
 WHERE
-  id = $1
+  id = $1 AND business_id = $5
 RETURNING id, name, place, phone_number, business_id, created_at, updated_at
 `
 
@@ -205,6 +236,7 @@ type UpdatePartyParams struct {
 	Name        string      `json:"name"`
 	Place       string      `json:"place"`
 	PhoneNumber pgtype.Text `json:"phone_number"`
+	BusinessID  pgtype.UUID `json:"business_id"`
 }
 
 // update a particular party
@@ -214,6 +246,7 @@ func (q *Queries) UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party
 		arg.Name,
 		arg.Place,
 		arg.PhoneNumber,
+		arg.BusinessID,
 	)
 	var i Party
 	err := row.Scan(

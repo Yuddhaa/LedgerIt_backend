@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strings"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
@@ -28,6 +29,10 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogError("UpdatePartyHandler", "bad request body", "err", err)
 		return
 	}
+	businessId, ok := auth.ExtractUUID(w, r, "id")
+	if !ok {
+		return
+	}
 	partyId, ok := auth.ExtractUUID(w, r, "party_id")
 	if !ok {
 		return
@@ -35,11 +40,12 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 	party, err := h.db.UpdateParty(r.Context(), db.UpdatePartyParams{
 		ID:    partyId,
 		Name:  body.Name,
-		Place: body.Place,
+		Place: strings.ToLower(body.Place),
 		PhoneNumber: pgtype.Text{
 			String: body.PhoneNumber,
 			Valid:  body.PhoneNumber != "",
 		},
+		BusinessID: businessId,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {

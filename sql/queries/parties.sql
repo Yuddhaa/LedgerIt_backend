@@ -19,18 +19,18 @@ SET
   phone_number = $4,
   updated_at = now()
 WHERE
-  id = $1
+  id = $1 AND business_id = $5
 RETURNING *;
 
 -- name: GetParty :one
 -- get a particular party
 SELECT * FROM parties
-WHERE id = $1;
+WHERE id = $1 AND business_id = $2;
 
 -- name: DeleteParty :one
 -- delete a particular party
 DELETE FROM parties
-WHERE id = $1
+WHERE id = $1 AND business_id = $2
 RETURNING id;
 
 -- name: ListPartiesByBusiness :many
@@ -51,3 +51,10 @@ SELECT DISTINCT place
 FROM parties
 WHERE business_id = $1
 ORDER BY place ASC;
+
+-- name: CheckMember :one
+-- returns 1 if a user is a member of a given business_id
+SELECT 1
+FROM business_members
+WHERE user_id = $1 AND business_id = $2
+LIMIT 1;
