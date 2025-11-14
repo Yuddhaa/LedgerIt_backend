@@ -27,10 +27,11 @@ RETURNING *;
 SELECT * FROM parties
 WHERE id = $1;
 
--- name: DeleteParty :exec
+-- name: DeleteParty :one
 -- delete a particular party
 DELETE FROM parties
-WHERE id = $1;
+WHERE id = $1
+RETURNING id;
 
 -- name: ListPartiesByBusiness :many
 -- get all parties realated a particualr businessId

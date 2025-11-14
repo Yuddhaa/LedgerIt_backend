@@ -19,7 +19,7 @@ type Querier interface {
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
 	// delete a particular party
-	DeleteParty(ctx context.Context, id pgtype.UUID) error
+	DeleteParty(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error)
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
 	// This is used for logging out a single device.
 	DeleteRefreshTokenByHash(ctx context.Context, tokenHash string) error

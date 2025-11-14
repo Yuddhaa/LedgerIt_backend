@@ -51,15 +51,17 @@ func (q *Queries) CreateParty(ctx context.Context, arg CreatePartyParams) (Party
 	return i, err
 }
 
-const deleteParty = `-- name: DeleteParty :exec
+const deleteParty = `-- name: DeleteParty :one
 DELETE FROM parties
 WHERE id = $1
+RETURNING id
 `
 
 // delete a particular party
-func (q *Queries) DeleteParty(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteParty, id)
-	return err
+func (q *Queries) DeleteParty(ctx context.Context, id pgtype.UUID) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteParty, id)
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getParty = `-- name: GetParty :one
