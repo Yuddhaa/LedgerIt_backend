@@ -3,6 +3,7 @@ package categories
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
@@ -28,7 +29,7 @@ func (h *Handler) AddCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	category, err := h.db.CreateCategory(r.Context(), db.CreateCategoryParams{
 		BusinessID: businessId,
-		Name:       body.Name,
+		Name:       strings.ToLower(body.Name),
 	})
 	if err != nil {
 		if helpers.IsUniqueViolation(err) {

@@ -41,7 +41,7 @@ type Querier interface {
 	// Retrieves all businesses a user is a member of, including their role and balance in each.
 	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
 	// get a particular category
-	GetCategory(ctx context.Context, id pgtype.UUID) (TransactionCategory, error)
+	GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
 	// get a particular party

@@ -26,7 +26,7 @@ WHERE id = $1;
 -- name: GetCategory :one
 -- get a particular category
 SELECT * FROM transaction_categories
-WHERE id = $1;
+WHERE id = $1 AND business_id = $2;
 
 -- name: ListCategoriesByBusiness :many
 -- get all category that belongs to a business_id

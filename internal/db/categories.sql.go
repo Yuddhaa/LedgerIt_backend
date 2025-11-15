@@ -53,12 +53,17 @@ func (q *Queries) DeleteCategory(ctx context.Context, id pgtype.UUID) error {
 
 const getCategory = `-- name: GetCategory :one
 SELECT id, business_id, name, created_at, updated_at FROM transaction_categories
-WHERE id = $1
+WHERE id = $1 AND business_id = $2
 `
 
+type GetCategoryParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
 // get a particular category
-func (q *Queries) GetCategory(ctx context.Context, id pgtype.UUID) (TransactionCategory, error) {
-	row := q.db.QueryRow(ctx, getCategory, id)
+func (q *Queries) GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error) {
+	row := q.db.QueryRow(ctx, getCategory, arg.ID, arg.BusinessID)
 	var i TransactionCategory
 	err := row.Scan(
 		&i.ID,
