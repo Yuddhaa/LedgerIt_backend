@@ -7,6 +7,7 @@ import (
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/business"
+	"LedgerIt/internal/categories"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/parties"
@@ -74,6 +75,7 @@ func (s *Server) setupRouter() {
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
 	transactionsHandler := transactions.NewHandler(s.db, s.pool)
 	partiesHandler := parties.NewHandler(s.db, s.pool)
+	categoriesHandler := categories.NewHandler(s.db, s.pool)
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +99,7 @@ func (s *Server) setupRouter() {
 		r.Mount("/api/v1/business/", businessHandler.Routes())
 		r.Mount("/api/v1/business/{id}/transactions", transactionsHandler.Routes())
 		r.Mount("/api/v1/business/{id}/parties", partiesHandler.Routes())
+		r.Mount("/api/v1/business/{id}/categories", categoriesHandler.Routes())
 	})
 
 	s.Router = r
