@@ -106,7 +106,7 @@ make run
 or, without Makefile:
 
 ```bash
-go run ./
+go run ./...
 ```
 
 ---
