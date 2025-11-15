@@ -53,6 +53,12 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.LogInfo("UpdatePartyHandler", "party not found in UpdateParty", "party_id", partyId)
 			return
 		}
+		if helpers.IsUniqueViolation(err) {
+			helpers.RespondWithError(w, http.StatusConflict, "party already exists")
+			// ADDED: Log the conflict
+			helpers.LogInfo("UpdatePartyHandler", "conflict: party already exists", "party name", body.Name, "business_id", businessId)
+			return
+		}
 		helpers.RespondWithError(w, 500, "Internal server error")
 		helpers.LogError("UpdatePartyHandler", "Db error in UpdateParty", "err", err, "body", body)
 		return
