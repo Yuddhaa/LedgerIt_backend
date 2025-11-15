@@ -46,7 +46,7 @@ func (h *Handler) AddPartyHandler(w http.ResponseWriter, r *http.Request) {
 		if helpers.IsUniqueViolation(err) {
 			helpers.RespondWithError(w, http.StatusConflict, "party already exists")
 			// ADDED: Log the conflict
-			helpers.LogInfo("AddPartyHandler", "conflict: party already a member", "party name", body.Name, "business_id", businessId)
+			helpers.LogInfo("AddPartyHandler", "conflict: party already exists", "party name", body.Name, "business_id", businessId)
 			return
 		}
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")

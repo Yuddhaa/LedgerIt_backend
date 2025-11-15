@@ -18,8 +18,12 @@ type Querier interface {
 	// returns 1 if a user is a member of a given business_id
 	CheckMember(ctx context.Context, arg CheckMemberParams) (int32, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
+	// add a new category
+	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
+	// delete a particular category
+	DeleteCategory(ctx context.Context, id pgtype.UUID) error
 	// delete a particular party
 	DeleteParty(ctx context.Context, arg DeletePartyParams) (pgtype.UUID, error)
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.
@@ -36,6 +40,8 @@ type Querier interface {
 	GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]Business, error)
 	// Retrieves all businesses a user is a member of, including their role and balance in each.
 	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
+	// get a particular category
+	GetCategory(ctx context.Context, id pgtype.UUID) (TransactionCategory, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
 	// get a particular party
@@ -50,6 +56,8 @@ type Querier interface {
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	// returns 1 if a user is a member of the given businessId
 	IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOfBusinessParams) (int32, error)
+	// get all category that belongs to a business_id
+	ListCategoriesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]TransactionCategory, error)
 	// get all parties realated a particualr businessId
 	ListPartiesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]Party, error)
 	// get all parties realted a particular businessId and place
@@ -57,6 +65,8 @@ type Querier interface {
 	// get all the unique places stored in parties table related to a businessId
 	ListUniquePartyPlacesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]string, error)
 	ListUsers(ctx context.Context) ([]User, error)
+	// update a particular category
+	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)

@@ -31,17 +31,17 @@ func (h *Handler) Routes() chi.Router {
 	r.Group(func(r chi.Router) {
 		r.Use(h.CheckAdmin)
 
-		// r.Post("/", h.AddPartyHandler)
-		// r.Put("/{party_id}", h.UpdatePartyHandler)
-		// r.Delete("/{party_id}", h.DeletePartyHandler)
+		r.Post("/", h.AddCategoryHandler)
+		r.Put("/{category_id}", h.UpdateCategoryHandler)
+		r.Delete("/{category_id}", h.DeleteCategoryHandler)
 	})
 
 	r.Group(func(r chi.Router) {
 		r.Use(h.CheckMember)
+
 		// for all of people in a business
-		// r.Get("/{party_id}", h.GetAPartyHandler)
-		// r.Get("/", h.GetPartyHandler)
-		// r.Get("/places", h.GetPlacesHandler)
+		r.Get("/{category_id}", h.GetACategoryHandler)
+		r.Get("/", h.GetAllCategoriesHandler)
 	})
 	return r
 }
