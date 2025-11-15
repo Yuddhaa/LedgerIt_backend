@@ -23,7 +23,7 @@ type Querier interface {
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
 	// delete a particular category
-	DeleteCategory(ctx context.Context, id pgtype.UUID) error
+	DeleteCategory(ctx context.Context, arg DeleteCategoryParams) (pgtype.UUID, error)
 	// delete a particular party
 	DeleteParty(ctx context.Context, arg DeletePartyParams) (pgtype.UUID, error)
 	// DeleteRefreshTokenByHash deletes a single refresh token by its hash.

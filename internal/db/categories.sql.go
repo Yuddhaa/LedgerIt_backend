@@ -40,15 +40,23 @@ func (q *Queries) CreateCategory(ctx context.Context, arg CreateCategoryParams) 
 	return i, err
 }
 
-const deleteCategory = `-- name: DeleteCategory :exec
+const deleteCategory = `-- name: DeleteCategory :one
 DELETE FROM transaction_categories
-WHERE id = $1
+WHERE id = $1 AND business_id = $2
+RETURNING id
 `
 
+type DeleteCategoryParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
 // delete a particular category
-func (q *Queries) DeleteCategory(ctx context.Context, id pgtype.UUID) error {
-	_, err := q.db.Exec(ctx, deleteCategory, id)
-	return err
+func (q *Queries) DeleteCategory(ctx context.Context, arg DeleteCategoryParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, deleteCategory, arg.ID, arg.BusinessID)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const getCategory = `-- name: GetCategory :one
@@ -111,21 +119,22 @@ func (q *Queries) ListCategoriesByBusiness(ctx context.Context, businessID pgtyp
 const updateCategory = `-- name: UpdateCategory :one
 UPDATE transaction_categories
 SET
-  name = $2,
+  name = $3,
   updated_at = now()
 WHERE
-  id = $1
+  id = $1 AND business_id = $2
 RETURNING id, business_id, name, created_at, updated_at
 `
 
 type UpdateCategoryParams struct {
-	ID   pgtype.UUID `json:"id"`
-	Name string      `json:"name"`
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+	Name       string      `json:"name"`
 }
 
 // update a particular category
 func (q *Queries) UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error) {
-	row := q.db.QueryRow(ctx, updateCategory, arg.ID, arg.Name)
+	row := q.db.QueryRow(ctx, updateCategory, arg.ID, arg.BusinessID, arg.Name)
 	var i TransactionCategory
 	err := row.Scan(
 		&i.ID,

@@ -12,16 +12,17 @@ RETURNING *;
 -- update a particular category
 UPDATE transaction_categories
 SET
-  name = $2,
+  name = $3,
   updated_at = now()
 WHERE
-  id = $1
+  id = $1 AND business_id = $2
 RETURNING *;
 
--- name: DeleteCategory :exec
+-- name: DeleteCategory :one
 -- delete a particular category
 DELETE FROM transaction_categories
-WHERE id = $1;
+WHERE id = $1 AND business_id = $2
+RETURNING id;
 
 -- name: GetCategory :one
 -- get a particular category

@@ -25,13 +25,18 @@ func (h *Handler) UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) 
 		helpers.LogError("UpdateCategoryHandler", "bad request body", "err", err)
 		return
 	}
+	BusinessID, ok := auth.ExtractUUID(w, r, "id")
+	if !ok {
+		return
+	}
 	categoryId, ok := auth.ExtractUUID(w, r, "category_id")
 	if !ok {
 		return
 	}
 	category, err := h.db.UpdateCategory(r.Context(), db.UpdateCategoryParams{
-		ID:   categoryId,
-		Name: body.Name,
+		ID:         categoryId,
+		Name:       body.Name,
+		BusinessID: BusinessID,
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
