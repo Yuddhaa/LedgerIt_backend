@@ -97,9 +97,9 @@ CREATE TABLE transactions (
     amount DECIMAL(10, 2) NOT NULL,
     direction transaction_direction NOT NULL,
     category_id UUID REFERENCES transaction_categories(id) ON DELETE SET NULL,
-    party_id UUID REFERENCES parties(id) ON DELETE SET NULL,
+    party_id UUID NOT NULL REFERENCES parties(id) ON DELETE RESTRICT,
     mode transaction_mode NOT NULL,
-    receipt_no TEXT,
+    receipt_no TEXT NOT NULL,
     description TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

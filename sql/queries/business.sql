@@ -64,3 +64,15 @@ WHERE user_id = $1 AND business_id = $2;
 SELECT 1
 FROM business_members
 WHERE user_id = $1 AND business_id = $2 AND role in ('admin', 'creator');
+
+
+-- returns the role of the user
+-- name: GetUserRole :one
+SELECT role FROM business_members
+WHERE user_id = $1 AND business_id = $2;
+
+-- used to update balance in transactions
+-- name: UpdateBusinessMemberBalance :exec
+UPDATE business_members
+SET current_balance = current_balance + $1
+WHERE user_id = $2 AND business_id = $3;

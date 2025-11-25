@@ -1,28 +1,168 @@
 package transactions
 
 import (
+	"encoding/json"
 	"net/http"
+
+	"LedgerIt/internal/auth"
+	"LedgerIt/internal/db"
+	"LedgerIt/internal/helpers"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// AddTransactionsHandler creates a new transaction row
 func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request) {
-	// businessUuid, ok := h.ExtractBusinessUUID(w, r)
-	// if !ok {
-	// 	return
-	// }
-	//
-	// type reqType struct {
-	// 	Amount      float64                     `json:"amount"`
-	// 	Direction   db.NullTransactionDirection `json:"direction"`
-	// 	Description pgtype.Text                 `json:"description"`
-	// 	PartyID     pgtype.UUID                 `json:"party_id"`
-	// 	Mode        db.NullTransactionMode      `json:"mode"`
-	// 	CategoryID  pgtype.Int4                 `json:"category_id"`
-	// }
-	// type resType struct{}
-	// var amount pgtype.Numeric
-	// amount.NumericValue()
-	// transaction, err := h.db.CreateTransaction(r.Context(), db.CreateTransactionParams{
-	// 	BusinessID: businessUuid,
-	// 	Amount:     pgtype.Numeric{},
-	// })
+	type reqType struct {
+		Amount      string                  `json:"amount"`
+		Direction   db.TransactionDirection `json:"direction"`
+		CategoryID  string                  `json:"category_id"`
+		PartyID     string                  `json:"party_id"`
+		Mode        db.TransactionMode      `json:"mode"`
+		ReceiptNo   string                  `json:"receipt_no"`
+		Description string                  `json:"description"`
+	}
+	type resType struct {
+		Transaction db.Transaction `json:"transaction"`
+	}
+	var body reqType
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
+		helpers.LogInfo("AddTransactionsHandler", "failed to decode request body", "error", err)
+		return
+	}
+	helpers.PrintJson("AddTransactionsHandler body", body)
+	// set up all the transactions column
+	// user id
+	userId, ok := auth.GetUserIdFromContext(w, r)
+	if !ok {
+		return
+	}
+
+	// business id
+	businessId, ok := auth.ExtractUUID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// amount
+	var amount pgtype.Numeric
+	if err := amount.Scan(body.Amount); err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid amount")
+		helpers.LogInfo("AddTransactionsHandler", "failed to convert amount str to int", "error", err.Error(), "amount", body.Amount)
+		return
+	}
+
+	//  categoryId
+	var categoryID pgtype.UUID
+	if body.CategoryID == "" {
+		categoryID = pgtype.UUID{
+			Valid: false,
+		}
+	} else {
+		tempCategoryId, err := uuid.Parse(body.CategoryID)
+		if err != nil {
+			helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid category_id")
+			helpers.LogInfo("AddTransactionsHandler", "failed to convert category_id str to uuid", "error", err, "category_id", body.CategoryID)
+			return
+		}
+		categoryID = pgtype.UUID{
+			Bytes: tempCategoryId,
+			Valid: tempCategoryId != uuid.Nil,
+		}
+	}
+
+	// partyId
+	tempPartyId, err := uuid.Parse(body.PartyID)
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid or no party_id")
+		helpers.LogInfo("AddTransactionsHandler", "failed to convert partyId str to uuid", "error", err, "party_id", body.PartyID)
+		return
+	}
+	partyId := pgtype.UUID{
+		Bytes: tempPartyId,
+		Valid: true,
+	}
+
+	// receipt number
+	if body.ReceiptNo == "" {
+		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: no receipt_no")
+		helpers.LogInfo("AddTransactionsHandler", "bad request: no receipt_no")
+		return
+	}
+
+	// description
+	description := pgtype.Text{
+		String: body.Description,
+		Valid:  body.Description != "",
+	}
+	// -------------------------------------------------------------------------
+	// START DATABASE TRANSACTION
+	// -------------------------------------------------------------------------
+	tx, err := h.db.Pool.Begin(r.Context())
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "server error")
+		helpers.LogError("AddTransactionsHandler", "failed to begin tx", "err", err)
+		return
+	}
+	defer tx.Rollback(r.Context())
+
+	qtx := h.db.WithTx(tx)
+
+	// -------------------------------------------------------------------------
+	// STEP 1: Create Transaction
+	// -------------------------------------------------------------------------
+	transaction, err := qtx.CreateTransactionWithValidation(r.Context(), db.CreateTransactionWithValidationParams{
+		UserID:      userId,
+		BusinessID:  businessId,
+		Amount:      amount,
+		Direction:   body.Direction,
+		CategoryID:  categoryID,
+		PartyID:     partyId,
+		Mode:        body.Mode,
+		ReceiptNo:   body.ReceiptNo,
+		Description: description,
+	})
+	if err == pgx.ErrNoRows {
+		// This means the WHERE clause in the SQL failed (invalid party/category)
+		helpers.RespondWithError(w, http.StatusBadRequest, "Invalid Party or Category for this Business")
+		return
+	} else if err != nil {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "Failed to create transaction")
+		helpers.LogError("AddTx", "Insert failed", "err", err)
+		return
+	}
+	// -------------------------------------------------------------------------
+	// STEP 2: Update Business Member Balance
+	// -------------------------------------------------------------------------
+
+	// Logic: If I collected Cash (IN), my "cash in hand" increases.
+	// If I Paid Cash (OUT), my "cash in hand" decreases.
+	signedAmount := amount
+	if body.Direction == db.TransactionDirectionOut {
+		signedAmount.Int.Neg(signedAmount.Int)
+	}
+	if err := qtx.UpdateBusinessMemberBalance(r.Context(), db.UpdateBusinessMemberBalanceParams{
+		CurrentBalance: signedAmount,
+		UserID:         userId,
+		BusinessID:     businessId,
+	}); err != nil {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "error updating balance")
+		helpers.LogError("AddTransactionsHandler", "balance update error", "err", err.Error())
+		return
+	}
+	// -------------------------------------------------------------------------
+	// STEP 3: Commit
+	// -------------------------------------------------------------------------
+	if err := tx.Commit(r.Context()); err != nil {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "commit failed")
+		helpers.LogError("AddTransactionsHandler", "commit error", "err", err.Error())
+		return
+	}
+
+	res := resType{Transaction: transaction}
+	helpers.LogInfo("AddTransactionsHandler", "response sent", "response", res)
+	helpers.RespondWithJSON(w, 201, res)
 }

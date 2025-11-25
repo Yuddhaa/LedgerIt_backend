@@ -282,7 +282,7 @@ type Transaction struct {
 	CategoryID  pgtype.UUID          `json:"category_id"`
 	PartyID     pgtype.UUID          `json:"party_id"`
 	Mode        TransactionMode      `json:"mode"`
-	ReceiptNo   pgtype.Text          `json:"receipt_no"`
+	ReceiptNo   string               `json:"receipt_no"`
 	Description pgtype.Text          `json:"description"`
 	CreatedAt   pgtype.Timestamptz   `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz   `json:"updated_at"`

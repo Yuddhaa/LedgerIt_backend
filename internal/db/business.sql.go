@@ -262,6 +262,24 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (B
 	return role, err
 }
 
+const getUserRole = `-- name: GetUserRole :one
+SELECT role FROM business_members
+WHERE user_id = $1 AND business_id = $2
+`
+
+type GetUserRoleParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// returns the role of the user
+func (q *Queries) GetUserRole(ctx context.Context, arg GetUserRoleParams) (BusinessRole, error) {
+	row := q.db.QueryRow(ctx, getUserRole, arg.UserID, arg.BusinessID)
+	var role BusinessRole
+	err := row.Scan(&role)
+	return role, err
+}
+
 const isUserMemberOfBusiness = `-- name: IsUserMemberOfBusiness :one
 SELECT 1
 FROM business_members
@@ -279,4 +297,22 @@ func (q *Queries) IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOf
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const updateBusinessMemberBalance = `-- name: UpdateBusinessMemberBalance :exec
+UPDATE business_members
+SET current_balance = current_balance + $1
+WHERE user_id = $2 AND business_id = $3
+`
+
+type UpdateBusinessMemberBalanceParams struct {
+	CurrentBalance pgtype.Numeric `json:"current_balance"`
+	UserID         pgtype.UUID    `json:"user_id"`
+	BusinessID     pgtype.UUID    `json:"business_id"`
+}
+
+// used to update balance in transactions
+func (q *Queries) UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error {
+	_, err := q.db.Exec(ctx, updateBusinessMemberBalance, arg.CurrentBalance, arg.UserID, arg.BusinessID)
+	return err
 }

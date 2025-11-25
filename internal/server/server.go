@@ -73,9 +73,12 @@ func (s *Server) setupRouter() {
 	}
 	userHandler := users.NewHandler(s.db, s.pool, s.logger)
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
-	transactionsHandler := transactions.NewHandler(s.db, s.pool)
 	partiesHandler := parties.NewHandler(s.db, s.pool)
 	categoriesHandler := categories.NewHandler(s.db, s.pool)
+
+	// for transactionshandler
+	dbStore := db.NewDBStore(s.pool)
+	transactionsHandler := transactions.NewHandler(dbStore)
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {

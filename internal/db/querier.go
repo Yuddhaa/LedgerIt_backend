@@ -22,6 +22,7 @@ type Querier interface {
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
+	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
 	// delete a particular category
 	DeleteCategory(ctx context.Context, arg DeleteCategoryParams) (pgtype.UUID, error)
 	// delete a particular party
@@ -52,6 +53,8 @@ type Querier interface {
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
+	// returns the role of the user
+	GetUserRole(ctx context.Context, arg GetUserRoleParams) (BusinessRole, error)
 	// InsertRefreshToken inserts a new refresh token into the database.
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	// returns 1 if a user is a member of the given businessId
@@ -65,12 +68,16 @@ type Querier interface {
 	// get all the unique places stored in parties table related to a businessId
 	ListUniquePartyPlacesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]string, error)
 	ListUsers(ctx context.Context) ([]User, error)
+	// used to update balance in transactions
+	UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error
 	// update a particular category
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
+	VerifyCategoryBelongsToBusiness(ctx context.Context, arg VerifyCategoryBelongsToBusinessParams) (bool, error)
+	VerifyPartyBelongsToBusiness(ctx context.Context, arg VerifyPartyBelongsToBusinessParams) (bool, error)
 }
 
 var _ Querier = (*Queries)(nil)
