@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"LedgerIt/internal/db"
-	"LedgerIt/internal/helpers" // Make sure helpers is imported
+	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/server"
 
 	"github.com/jackc/pgx/v5"
@@ -30,7 +30,6 @@ func main() {
 	// 1. Open the log file
 	logFile, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
-		// Can't use helpers yet, so just use slog
 		slog.Error("Failed to open log file", "error", err)
 		os.Exit(1)
 	}
@@ -54,41 +53,55 @@ func main() {
 	// 5. Inject the file-only logger into your helpers package
 	helpers.Logger = logger
 
-	// --- From now on, use helpers.LogInfo and helpers.LogError ---
 	if err := godotenv.Load(); err != nil {
-		// This is not an error in production, it's expected.
-		// We'll just log that we're not using a .env file.
 		helpers.LogInfo("main", "could not load .env file, using environment variables")
 	}
-	// if err := godotenv.Load(); err != nil {
-	// 	// CHANGED: Switched to helper and used structured error
-	// 	helpers.LogError("main", "error in godotenv.Load()", "error", err)
-	// 	os.Exit(1)
-	// }
 
-	// CHANGED: Removed logger param, it's now global in helpers
 	cfg := loadConfig()
 
-	// db connection
+	// --- DATABASE CONNECTION LOGIC (FIXED) ---
+
+	// 1. Create a context for the connection attempt
 	dbCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
-	dbConn, err := pgx.Connect(dbCtx, cfg.dbURL)
+
+	// 2. Parse the config first so we can modify it
+	dbConfig, err := pgxpool.ParseConfig(cfg.dbURL)
 	if err != nil {
-		// CHANGED: Switched to helper and used structured error
-		helpers.LogError("main", "error in connecting to db", "error", err)
+		helpers.LogError("main", "error parsing db config", "error", err)
 		os.Exit(1)
 	}
-	db := db.New(dbConn)
-	pool, err := pgxpool.New(dbCtx, cfg.dbURL)
+
+	// --- THE FIX FOR "conn busy" & RACE CONDITIONS ---
+	// Disable the implicit statement cache. This prevents the driver from trying
+	// to clean up prepared statements on a connection that was just cancelled.
+	dbConfig.ConnConfig.StatementCacheCapacity = 0
+	// -------------------------------------------------
+	dbConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
+	// 3. Create the Pool (Thread-safe, handles concurrency)
+	pool, err := pgxpool.NewWithConfig(dbCtx, dbConfig)
 	if err != nil {
-		// CHANGED: Switched to helper and used structured error
-		helpers.LogError("main", "error in connecting to a pool", "error", err)
+		helpers.LogError("main", "error connecting to db pool", "error", err)
 		os.Exit(1)
 	}
 	defer pool.Close()
 
+	// 4. Verify connection
+	if err := pool.Ping(dbCtx); err != nil {
+		helpers.LogError("main", "error pinging db", "error", err)
+		os.Exit(1)
+	}
+
+	// 5. Initialize sqlc with the POOL
+	// Your db.New() accepts DBTX interface, which pgxpool.Pool satisfies.
+	// This ensures every query gets its own connection from the pool.
+	dbQueries := db.New(pool)
+
+	// --- END DATABASE LOGIC ---
+
 	// new server object
-	srvr := server.NewServer(db, pool, logger)
+	// Pass dbQueries (backed by pool) and the pool itself
+	srvr := server.NewServer(dbQueries, pool, logger)
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%v", cfg.port),
@@ -96,13 +109,11 @@ func main() {
 	}
 
 	go func() {
-		// CHANGED: Switched to helper
 		logger.Info(" ------------------------------------------------ ")
 		helpers.LogInfo("main", "Starting server", "port", cfg.port)
 		logger.Info(" ------------------------------------------------ ")
 
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			// CHANGED: Switched to helper
 			helpers.LogError("main", "Server error", "error", err)
 			os.Exit(1)
 		}
@@ -113,23 +124,19 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	// CHANGED: Switched to helper
 	helpers.LogInfo("main", "Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		// CHANGED: Swwitched to helper
 		helpers.LogError("main", "Server shutdown failed", "error", err)
 		os.Exit(1)
 	}
 
-	// CHANGED: Switched to helper
 	helpers.LogInfo("main", "Server exited gracefully")
 }
 
-// CHANGED: Removed logger parameter, now uses helpers package directly
 func loadConfig() *config {
 	cfg := &config{
 		port:  os.Getenv("PORT"),
@@ -137,13 +144,12 @@ func loadConfig() *config {
 	}
 
 	if cfg.port == "" {
-		cfg.port = "3000" // Default port
+		cfg.port = "3000"
 	}
 
 	if cfg.dbURL == "" {
-		// CHANGED: Switched to helper
 		helpers.LogError("loadConfig", "DBURL must be set in environment variables")
-		// Note: You might want to os.Exit(1) here too
+		os.Exit(1) // Added Exit here as configuration is mandatory
 	}
 
 	return cfg

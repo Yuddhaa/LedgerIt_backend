@@ -23,7 +23,7 @@ func (h *Handler) GetAllBusinessHandler(w http.ResponseWriter, r *http.Request) 
 	if err != nil {
 		// CHANGED: Don't leak DB error. Use structured logging.
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("GetAllBusinessHandler", "db error in GetBusinessesByUserID", "error", err, "user_id", userId)
+		helpers.LogError("GetAllBusinessHandler", "db error in GetBusinessesByUserID", "error", err.Error(), "user_id", userId)
 		return
 	}
 
