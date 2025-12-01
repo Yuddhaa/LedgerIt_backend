@@ -2,7 +2,6 @@ package business
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"LedgerIt/internal/auth"
@@ -11,13 +10,22 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // AddMemberHandler adds a new user to a business with a specific role.
 // Only the 'creator' or an 'admin' of the business can perform this action.
 func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
+	// if user is not admin|creator return at the beginning itself
+	role, ok := auth.GetUserRoleFromContext(w, r)
+	if !ok {
+		return
+	}
+	if role == 2 {
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Not enough credentials")
+		helpers.LogInfo("AddMemberHandler", "not an admin|creator")
+		return
+	}
 	type reqType struct {
 		UserId string          `json:"user_id"`
 		Role   db.BusinessRole `json:"role"`
@@ -29,19 +37,11 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("AddMemberHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("AddMemberHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 
 	// 1. Get Requestor's ID
-	// requestorId, ok := h.getUserIDFromContext(w, r)
-	// if !ok {
-	// 	return // error and response already sent
-	// }
-	// requestorUuid := pgtype.UUID{
-	// 	Bytes: requestorId,
-	// 	Valid: requestorId != uuid.Nil,
-	// }
 	requestorUuid, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return
@@ -52,7 +52,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid business ID")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("AddMemberHandler", "failed to parse business ID from URL", "error", err, "url_param", chi.URLParam(r, "id"))
+		helpers.LogInfo("AddMemberHandler", "failed to parse business ID from URL", "error", err.Error(), "url_param", chi.URLParam(r, "id"))
 		return
 	}
 	businessUuid := pgtype.UUID{
@@ -61,40 +61,13 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// -------------------------------------------------------------------------------
-	// 2. Authorization Check
-	// -------------------------------------------------------------------------------
-	role, err := h.db.GetMemberRole(r.Context(), db.GetMemberRoleParams{
-		UserID:     requestorUuid,
-		BusinessID: businessUuid,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			helpers.RespondWithError(w, http.StatusForbidden, "Access denied")
-			// ADDED: Log the failed authz check
-			helpers.LogInfo("AddMemberHandler", "authz failed: requestor not a member", "requestor_id", requestorUuid, "business_id", businessId)
-			return
-		}
-		// Any other error is a real 500
-		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("AddMemberHandler", "db error in GetMemberRole", "error", err, "requestor_id", requestorUuid)
-		return
-	}
-
-	// A safer "deny-by-default" check
-	if role != db.BusinessRoleCreator && role != db.BusinessRoleAdmin {
-		helpers.RespondWithError(w, http.StatusForbidden, "Not authorized to add members")
-		// ADDED: Log the failed authz check
-		helpers.LogInfo("AddMemberHandler", "authz failed: insufficient role", "requestor_id", requestorUuid, "role", role)
-		return
-	}
-	// -------------------------------------------------------------------------------
-	// 3. Add New Member
+	// 2. Add New Member
 	// -------------------------------------------------------------------------------
 	newUserId, err := uuid.Parse(body.UserId)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid user_id format")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("AddMemberHandler", "failed to parse new user ID from body", "error", err, "user_id_body", body.UserId)
+		helpers.LogInfo("AddMemberHandler", "failed to parse new user ID from body", "error", err.Error(), "user_id_body", body.UserId)
 		return
 	}
 	member, err := h.db.AddBusinessMember(r.Context(), db.AddBusinessMemberParams{
@@ -114,7 +87,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		// Any other error is a real 500
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("AddMemberHandler", "db error in AddBusinessMember", "error", err, "new_user_id", newUserId)
+		helpers.LogError("AddMemberHandler", "db error in AddBusinessMember", "error", err.Error(), "new_user_id", newUserId)
 		return
 	}
 

@@ -76,3 +76,7 @@ WHERE user_id = $1 AND business_id = $2;
 UPDATE business_members
 SET current_balance = current_balance + $1
 WHERE user_id = $2 AND business_id = $3;
+
+-- used to delete a business
+-- name: DeleteBusiness :exec
+DELETE FROM businesses WHERE id = $1;

@@ -23,6 +23,8 @@ type Querier interface {
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
 	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
+	// used to delete a business
+	DeleteBusiness(ctx context.Context, id pgtype.UUID) error
 	// delete a particular category
 	DeleteCategory(ctx context.Context, arg DeleteCategoryParams) (pgtype.UUID, error)
 	// delete a particular party

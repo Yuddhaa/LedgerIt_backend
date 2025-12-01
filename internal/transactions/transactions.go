@@ -156,14 +156,3 @@ func (h *Handler) CheckMember(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
-
-// GetUserRole extract and returns user id form context
-func GetUserRoleFromContext(w http.ResponseWriter, r *http.Request) (int, bool) {
-	role, ok := r.Context().Value("role").(int)
-	if !ok {
-		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve role from context")
-		helpers.LogError("GetUserRoleFromContext", "could not retrieve role from context")
-		return role, false
-	}
-	return role, true
-}

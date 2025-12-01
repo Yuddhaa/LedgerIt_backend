@@ -213,6 +213,17 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
 	return claims, ok
 }
 
+// GetUserRole extract and returns user id form context
+func GetUserRoleFromContext(w http.ResponseWriter, r *http.Request) (int, bool) {
+	role, ok := r.Context().Value("role").(int)
+	if !ok {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve role from context")
+		helpers.LogError("GetUserRoleFromContext", "could not retrieve role from context")
+		return role, false
+	}
+	return role, true
+}
+
 // uuidToString converts a pgtype.UUID to its string representation.
 // If the UUID is invalid, it returns an empty string.
 func (h *Handler) uuidToString(id pgtype.UUID) string {

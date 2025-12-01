@@ -24,7 +24,7 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	role, ok := GetUserRoleFromContext(w, r)
+	role, ok := auth.GetUserRoleFromContext(w, r)
 	if !ok {
 		return
 	}
