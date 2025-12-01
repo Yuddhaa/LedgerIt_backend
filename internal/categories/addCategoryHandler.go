@@ -20,7 +20,7 @@ func (h *Handler) AddCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad request")
-		helpers.LogError("AddCategoryHandler", "json decode error", "err", err)
+		helpers.LogError("AddCategoryHandler", "json decode error", "err", err.Error())
 		return
 	}
 	businessId, ok := auth.ExtractUUID(w, r, "id")
@@ -39,7 +39,7 @@ func (h *Handler) AddCategoryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("AddCategoryHandler", "error in db CreateCategory", "err", err)
+		helpers.LogError("AddCategoryHandler", "error in db CreateCategory", "err", err.Error())
 		return
 	}
 	res := resType{Category: category}

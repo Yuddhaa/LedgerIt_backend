@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -10,7 +11,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
@@ -31,8 +31,11 @@ func (h *Handler) Routes() chi.Router {
 
 	// for all of people in a business
 	r.Group(func(r chi.Router) {
-		r.Use(h.CheckMember)
+		// r.Use(h.CheckMember)
+		// GetRole automatically returns 403 for non members
+		r.Use(h.GetRole)
 		r.Post("/", h.AddTransactionsHandler)
+		r.Get("/", h.GetTransactionsHandler)
 	})
 	return r
 }
@@ -47,28 +50,44 @@ func (h *Handler) TransactionAuthMiddleware(next http.Handler) http.Handler {
 
 // Getrole returns int corresponding to the role as below
 // -1 - err
-// 0 - not a member
+// 0 - not a member => for these 2 automatically the middleware returns respective status code
 // 1 - admin/creator
 // 2 - employee
-func (h *Handler) GetRole(w http.ResponseWriter, r *http.Request, businessId, userId pgtype.UUID) int {
-	role, err := h.db.GetUserRole(r.Context(), db.GetUserRoleParams{
-		UserID:     userId,
-		BusinessID: businessId,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			helpers.RespondWithError(w, http.StatusUnauthorized, "no user found")
-			helpers.LogInfo("GetRole", "no user found", "userId", userId, "businessId", businessId)
-			return 0
+func (h *Handler) GetRole(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		roleInt := -1
+		userId, ok := auth.GetUserIdFromContext(w, r)
+		if !ok {
+			return
 		}
-		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
-		helpers.LogError("getrole", "db error in GetUserRole", "err", err, "userId", userId, "businessId", businessId)
-		return -1
-	}
-	if role == db.BusinessRoleEmployee {
-		return 2
-	}
-	return 1
+		businessId, ok := auth.ExtractUUID(w, r, "id")
+		if !ok {
+			return
+		}
+		role, err := h.db.GetUserRole(r.Context(), db.GetUserRoleParams{
+			UserID:     userId,
+			BusinessID: businessId,
+		})
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				helpers.RespondWithError(w, http.StatusUnauthorized, "no user found")
+				helpers.LogInfo("GetRole", "no user found", "userId", userId, "businessId", businessId)
+				roleInt = 0
+				return
+			}
+			helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
+			helpers.LogError("getrole", "db error in GetUserRole", "err", err, "userId", userId, "businessId", businessId)
+			roleInt = -1
+			return
+		}
+		if role == db.BusinessRoleEmployee {
+			roleInt = 2
+		}
+		roleInt = 1
+
+		ctx := context.WithValue(r.Context(), "role", roleInt)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
 }
 
 // checkAdmin checks if the user is admin or creator or not..
@@ -136,4 +155,15 @@ func (h *Handler) CheckMember(next http.Handler) http.Handler {
 		// User is a member, proceed to the next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+// GetUserRole extract and returns user id form context
+func GetUserRoleFromContext(w http.ResponseWriter, r *http.Request) (int, bool) {
+	role, ok := r.Context().Value("role").(int)
+	if !ok {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve role from context")
+		helpers.LogError("GetUserRoleFromContext", "could not retrieve role from context")
+		return role, false
+	}
+	return role, true
 }

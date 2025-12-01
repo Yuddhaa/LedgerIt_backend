@@ -197,7 +197,7 @@ func ExtractUUID(w http.ResponseWriter, r *http.Request, variable string) (pgtyp
 	UUID, err := uuid.Parse(uuidStr)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url Param")
-		helpers.LogError("ExtractBusinessUUID", "bad url param", "Err", err)
+		helpers.LogError("ExtractUUID", "bad url param:"+variable, "err", err.Error())
 		return pgtype.UUID{}, false
 	}
 	return pgtype.UUID{
