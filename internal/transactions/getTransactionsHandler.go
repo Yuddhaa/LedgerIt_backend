@@ -3,19 +3,25 @@ package transactions
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// GetTransactionsHandler returns all the transactions
+// after doing filtering at db level based on the query params passed
 func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	type resType struct {
-		Transactions []db.Transaction `json:"transactions"`
+		Stats        db.TransactionStats `json:"stats"`
+		Transactions []db.Transaction    `json:"transactions"`
 	}
+	// **********************************************
+	// get all the data required for the filteing
+	// **********************************************
 	loggedUserId, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return
@@ -45,16 +51,47 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
+
+	fromDate, ok := parseDate(w, "from", r.URL.Query().Get("from"))
+	if !ok {
+		return
+	}
+
+	toDate, ok := parseDate(w, "to", r.URL.Query().Get("to"))
+	if !ok {
+		return
+	}
+	// If we have a 'to' date, set it to the very last nanosecond of that day.
+	if !toDate.IsZero() {
+		toDate = time.Date(
+			toDate.Year(), toDate.Month(), toDate.Day(),
+			23, 59, 59, 999999999, // Hour, Min, Sec, Nsec
+			toDate.Location(),
+		)
+	}
+
+	sortBy := r.URL.Query().Get("sortBy")
+	order := r.URL.Query().Get("order")
 	mode := strings.ToLower(r.URL.Query().Get("mode"))
 	direction := strings.ToLower(r.URL.Query().Get("direction"))
-	GetFilteredTransactionsInput := db.GetFilteredTransactionsParams{
+
+	GetFilteredTransactionsInput := db.FilterParams{
 		BusinessID: businessId,
 		UserID:     userId,
 		CategoryID: categoryId,
 		PartyID:    partyId,
 		Mode:       db.TransactionMode(mode),
 		Direction:  db.TransactionDirection(direction),
+		FromDate:   fromDate,
+		ToDate:     toDate,
+		SortBy:     sortBy,
+		SortOrder:  order,
 	}
+
+	// **********************************************
+	// Do the db calls [get transactions and get stats]
+	// **********************************************
+
 	transactions, err := h.db.GetFilteredTransactions(r.Context(), GetFilteredTransactionsInput)
 	if err != nil {
 		helpers.LogError("GetTransactionsHandler", "error in GetFilteredTransactions",
@@ -62,25 +99,19 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 		helpers.RespondWithError(w, 500, "internal server error")
 		return
 	}
-	res := resType{Transactions: transactions}
-	helpers.RespondWithJSON(w, 200, res)
-	helpers.LogInfo("GetTransactionsHandler", "success", "count of transactions", len(res.Transactions))
-}
 
-func convertToUUID(w http.ResponseWriter, name, uuidStr string) (pgtype.UUID, bool) {
-	if uuidStr == "" {
-		return pgtype.UUID{
-			Valid: false,
-		}, true
-	}
-	UUID, err := uuid.Parse(uuidStr)
+	stats, err := h.db.GetTransactionStats(r.Context(), GetFilteredTransactionsInput)
 	if err != nil {
-		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url query")
-		helpers.LogError("convertToUUID", "bad query parameter:"+name, "Err", err.Error())
-		return pgtype.UUID{}, false
+		helpers.LogError("GetTransactionsHandler", "error in GetTransactionStats",
+			"err", err.Error(), "GetFilteredTransactionsParams", GetFilteredTransactionsInput)
+		helpers.RespondWithError(w, 500, "internal server error")
+		return
 	}
-	return pgtype.UUID{
-		Bytes: UUID,
-		Valid: UUID != uuid.Nil,
-	}, true
+
+	// **********************************************
+	// respond
+	// **********************************************
+	res := resType{Transactions: transactions, Stats: stats}
+	helpers.RespondWithJSON(w, 200, res)
+	helpers.LogInfo("GetTransactionsHandler", "success", "count of transactions", len(res.Transactions), "transaction stats", stats)
 }

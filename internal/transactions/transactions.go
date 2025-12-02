@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
@@ -155,4 +158,40 @@ func (h *Handler) CheckMember(next http.Handler) http.Handler {
 		// User is a member, proceed to the next handler
 		next.ServeHTTP(w, r)
 	})
+}
+
+func parseDate(w http.ResponseWriter, paramName, dateStr string) (time.Time, bool) {
+	if dateStr == "" {
+		return time.Time{}, true // Return zero time if empty
+	}
+
+	// Layout for YYYY-MM-DD
+	layout := "2006-01-02"
+	// layout := "2006-01-02 15:04:05.999999+00"
+	parsedTime, err := time.Parse(layout, dateStr)
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "Invalid date format for "+paramName+". Use YYYY-MM-DD")
+		helpers.LogError("parseDate", "date parse error", "err", err.Error())
+		return time.Time{}, false
+	}
+	helpers.PrintJson("parsedTime", parsedTime)
+	return parsedTime, true
+}
+
+func convertToUUID(w http.ResponseWriter, name, uuidStr string) (pgtype.UUID, bool) {
+	if uuidStr == "" {
+		return pgtype.UUID{
+			Valid: false,
+		}, true
+	}
+	UUID, err := uuid.Parse(uuidStr)
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url query")
+		helpers.LogError("convertToUUID", "bad query parameter:"+name, "Err", err.Error())
+		return pgtype.UUID{}, false
+	}
+	return pgtype.UUID{
+		Bytes: UUID,
+		Valid: UUID != uuid.Nil,
+	}, true
 }
