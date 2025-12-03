@@ -9,6 +9,7 @@ import (
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -34,20 +35,20 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	var userId pgtype.UUID
+	var userId []pgtype.UUID
 	if role == 2 {
-		userId = loggedUserId
+		userId = append(userId, loggedUserId)
 	} else {
-		userId, ok = convertToUUID(w, "queryUserId", r.URL.Query().Get("user_id"))
+		userId, ok = parseUUIDList(w, "queryUserId", r.URL.Query()["user_id"])
 		if !ok {
 			return
 		}
 	}
-	categoryId, ok := convertToUUID(w, "categoryId", r.URL.Query().Get("category_id"))
+	categoryId, ok := parseUUIDList(w, "categoryId", r.URL.Query()["category_id"])
 	if !ok {
 		return
 	}
-	partyId, ok := convertToUUID(w, "partyId", r.URL.Query().Get("party_id"))
+	partyId, ok := parseUUIDList(w, "partyId", r.URL.Query()["party_id"])
 	if !ok {
 		return
 	}
@@ -72,7 +73,10 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 
 	sortBy := r.URL.Query().Get("sortBy")
 	order := r.URL.Query().Get("order")
-	mode := strings.ToLower(r.URL.Query().Get("mode"))
+	mode := r.URL.Query()["mode"]
+	for i := range mode {
+		mode[i] = strings.ToLower(mode[i])
+	}
 	direction := strings.ToLower(r.URL.Query().Get("direction"))
 
 	GetFilteredTransactionsInput := db.FilterParams{
@@ -80,7 +84,7 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 		UserID:     userId,
 		CategoryID: categoryId,
 		PartyID:    partyId,
-		Mode:       db.TransactionMode(mode),
+		Mode:       mode,
 		Direction:  db.TransactionDirection(direction),
 		FromDate:   fromDate,
 		ToDate:     toDate,
@@ -114,4 +118,28 @@ func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	res := resType{Transactions: transactions, Stats: stats}
 	helpers.RespondWithJSON(w, 200, res)
 	helpers.LogInfo("GetTransactionsHandler", "success", "count of transactions", len(res.Transactions), "transaction stats", stats)
+}
+
+func parseUUIDList(w http.ResponseWriter, paramName string, values []string) ([]pgtype.UUID, bool) {
+	if len(values) == 0 {
+		return nil, true // Empty is fine (means "all")
+	}
+
+	validUUIDs := make([]pgtype.UUID, 0, len(values))
+	for _, v := range values {
+		if v == "" {
+			continue
+		}
+		UUID, err := uuid.Parse(v)
+		if err != nil {
+			helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url query")
+			helpers.LogError("convertToUUID", "bad query parameter:"+paramName, "Err", err.Error())
+			return nil, false
+		}
+		validUUIDs = append(validUUIDs, pgtype.UUID{
+			Bytes: UUID,
+			Valid: uuid.Nil != UUID,
+		})
+	}
+	return validUUIDs, true
 }

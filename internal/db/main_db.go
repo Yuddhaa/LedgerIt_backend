@@ -30,10 +30,10 @@ func NewDBStore(pool *pgxpool.Pool) *DBStore {
 // GetFilteredTransactionsParams refers to params required to build whereClause
 type FilterParams struct {
 	BusinessID pgtype.UUID          `json:"business_id"`
-	UserID     pgtype.UUID          `json:"user_id"`
-	PartyID    pgtype.UUID          `json:"party_id"`
-	CategoryID pgtype.UUID          `json:"category_id"`
-	Mode       TransactionMode      `json:"mode"`
+	UserID     []pgtype.UUID        `json:"user_id"`
+	PartyID    []pgtype.UUID        `json:"party_id"`
+	CategoryID []pgtype.UUID        `json:"category_id"`
+	Mode       []string             `json:"mode"`
 	Direction  TransactionDirection `json:"direction"`
 	FromDate   time.Time            `json:"from_date"`
 	ToDate     time.Time            `json:"to_date"`
@@ -50,23 +50,23 @@ func (db *DBStore) buildWhereClause(arg FilterParams) (string, []any) {
 	count := 2
 
 	// build the query and args sequentially
-	if arg.UserID.Valid {
-		query += fmt.Sprintf(" AND user_id = $%d", count)
+	if len(arg.UserID) > 0 {
+		query += fmt.Sprintf(" AND user_id = ANY($%d)", count)
 		queryArgs = append(queryArgs, arg.UserID)
 		count += 1
 	}
-	if arg.PartyID.Valid {
-		query += fmt.Sprintf(" AND party_id = $%d", count)
+	if len(arg.PartyID) > 0 {
+		query += fmt.Sprintf(" AND party_id = ANY($%d)", count)
 		queryArgs = append(queryArgs, arg.PartyID)
 		count += 1
 	}
-	if arg.CategoryID.Valid {
-		query += fmt.Sprintf(" AND category_id = $%d", count)
+	if len(arg.CategoryID) > 0 {
+		query += fmt.Sprintf(" AND category_id = ANY($%d)", count)
 		queryArgs = append(queryArgs, arg.CategoryID)
 		count += 1
 	}
-	if arg.Mode != "" {
-		query += fmt.Sprintf(" AND mode = $%d", count)
+	if len(arg.Mode) > 0 {
+		query += fmt.Sprintf(" AND mode = ANY($%d)", count)
 		queryArgs = append(queryArgs, arg.Mode)
 		count += 1
 	}

@@ -11,9 +11,7 @@ import (
 	"LedgerIt/internal/helpers"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type Handler struct {
@@ -176,22 +174,4 @@ func parseDate(w http.ResponseWriter, paramName, dateStr string) (time.Time, boo
 	}
 	helpers.PrintJson("parsedTime", parsedTime)
 	return parsedTime, true
-}
-
-func convertToUUID(w http.ResponseWriter, name, uuidStr string) (pgtype.UUID, bool) {
-	if uuidStr == "" {
-		return pgtype.UUID{
-			Valid: false,
-		}, true
-	}
-	UUID, err := uuid.Parse(uuidStr)
-	if err != nil {
-		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url query")
-		helpers.LogError("convertToUUID", "bad query parameter:"+name, "Err", err.Error())
-		return pgtype.UUID{}, false
-	}
-	return pgtype.UUID{
-		Bytes: UUID,
-		Valid: UUID != uuid.Nil,
-	}, true
 }
