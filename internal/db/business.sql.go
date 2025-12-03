@@ -309,6 +309,34 @@ func (q *Queries) IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOf
 	return column_1, err
 }
 
+const updateBusiness = `-- name: UpdateBusiness :one
+UPDATE businesses
+SET
+  name = $2,
+  updated_at = NOW()
+WHERE
+  id = $1
+RETURNING id, name, owner_id, created_at, updated_at
+`
+
+type UpdateBusinessParams struct {
+	ID   pgtype.UUID `json:"id"`
+	Name string      `json:"name"`
+}
+
+func (q *Queries) UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error) {
+	row := q.db.QueryRow(ctx, updateBusiness, arg.ID, arg.Name)
+	var i Business
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateBusinessMemberBalance = `-- name: UpdateBusinessMemberBalance :exec
 UPDATE business_members
 SET current_balance = current_balance + $1

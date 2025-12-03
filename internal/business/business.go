@@ -44,8 +44,9 @@ func (h *Handler) Routes() chi.Router {
 		r.Get("/members", h.GetBusinessMembers)
 		r.Get("/balance", h.GetBalance)
 		r.Group(func(r chi.Router) {
-			r.Use(h.GetRole)
+			r.Use(h.GetRole) // for admin|creator related routes
 			r.Post("/members", h.AddMemberHandler)
+			r.Patch("/", h.UpdateBusinessHandler)
 			r.Delete("/", h.DeleteBusinessHandler)
 		})
 	})
@@ -80,7 +81,7 @@ func (h *Handler) GetRole(next http.Handler) http.Handler {
 				return
 			}
 			helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
-			helpers.LogError("getrole", "db error in GetUserRole", "err", err, "userId", userId, "businessId", businessId)
+			helpers.LogError("getrole", "db error in GetUserRole", "error", err.Error(), "userId", userId, "businessId", businessId)
 			roleInt = -1
 			return
 		}

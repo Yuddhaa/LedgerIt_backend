@@ -4,6 +4,15 @@ SELECT * FROM create_business_and_add_owner(
     p_name := $2
 );
 
+-- name: UpdateBusiness :one
+UPDATE businesses
+SET
+  name = $2,
+  updated_at = NOW()
+WHERE
+  id = $1
+RETURNING *;
+
 -- Based on userid and businessid it will return role
 -- name: GetMemberRole :one
 Select bm.role from business_members bm WHERE bm.user_id = $1 AND bm.business_id = $2;
