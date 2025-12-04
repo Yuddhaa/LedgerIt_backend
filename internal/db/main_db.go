@@ -97,21 +97,46 @@ func (db *DBStore) buildWhereClause(arg FilterParams) (string, []any) {
 	return query, queryArgs
 }
 
+type GetFilteredTransactionsRows struct {
+	Transaction          // Embeds all original fields (ID, Amount, etc.)
+	UserName     *string `json:"user_name"`
+	PartyName    *string `json:"party_name"`
+	CategoryName *string `json:"category_name"`
+}
+
 // GetFilteredTransactions does a db call to get all the filtered transactions
-func (db *DBStore) GetFilteredTransactions(ctx context.Context, arg FilterParams) ([]Transaction, error) {
+func (db *DBStore) GetFilteredTransactions(ctx context.Context, arg FilterParams) ([]GetFilteredTransactionsRows, error) {
+	// 1. Get the basic filtering logic (FROM transactions WHERE ...)
+	// This ensures we don't break Stats or SingleTransaction
 	whereClause, queryArgs := db.buildWhereClause(arg)
 
-	query := "SELECT * " + whereClause
-	helpers.PrintJson("query", query)
+	// 2. Wrap it in a CTE (WITH clause)
+	// We create a temporary view 't' containing only the filtered transactions,
+	// then we join the other tables to 't'.
+	query := fmt.Sprintf(`
+		WITH filtered_tx AS (
+			SELECT * %s
+		)
+		SELECT 
+			t.*,
+			u.name as user_name,
+			p.name as party_name,
+			c.name as category_name
+		FROM filtered_tx t
+		LEFT JOIN users u ON t.user_id = u.id
+		LEFT JOIN parties p ON t.party_id = p.id
+		LEFT JOIN transaction_categories c ON t.category_id = c.id
+	`, whereClause)
 
-	orderByClause := " ORDER BY created_at DESC"
+	// 3. Sorting Logic
+	// Note: We use "t." prefix to be safe, though strictly not required in this specific structure.
+	orderByClause := " ORDER BY t.created_at DESC"
 
-	// Whitelist allowed columns to prevent SQL Injection
 	validSortColumns := map[string]string{
-		"amount":     "amount",
-		"created_at": "created_at",
+		"amount":     "t.amount",
+		"created_at": "t.created_at",
 	}
-	// Check if user provided a valid sort column
+
 	if col, exists := validSortColumns[arg.SortBy]; exists {
 		direction := "DESC"
 		if strings.ToUpper(arg.SortOrder) == "ASC" {
@@ -119,22 +144,24 @@ func (db *DBStore) GetFilteredTransactions(ctx context.Context, arg FilterParams
 		}
 		orderByClause = fmt.Sprintf(" ORDER BY %s %s", col, direction)
 	} else if arg.SortOrder != "" && (strings.ToUpper(arg.SortOrder) == "ASC" || strings.ToUpper(arg.SortOrder) == "DESC") {
-		orderByClause = fmt.Sprintf("ORDER BY created_at %s", strings.ToUpper(arg.SortOrder))
+		orderByClause = fmt.Sprintf(" ORDER BY t.created_at %s", strings.ToUpper(arg.SortOrder))
 	}
 
 	query += orderByClause
-	helpers.LogInfo("db GetFilteredTransactions", "2", "query", query, "args", queryArgs)
+	helpers.LogInfo("db GetFilteredTransactions", "final_query", "query", query, "args", queryArgs)
 
-	// query call
+	// 4. Execute
 	rows, err := db.Pool.Query(ctx, query, queryArgs...)
 	if err != nil {
 		helpers.LogError("db GetFilteredTransactions", "error in sending the query itself", "err", err.Error())
 		return nil, err
 	}
 	defer rows.Close()
-	var transactions []Transaction
+
+	var transactions []GetFilteredTransactionsRows
 	for rows.Next() {
-		var i Transaction
+		var i GetFilteredTransactionsRows
+		// Scan the embedded Transaction struct fields first
 		if err := rows.Scan(
 			&i.ID,
 			&i.BusinessID,
@@ -148,11 +175,14 @@ func (db *DBStore) GetFilteredTransactions(ctx context.Context, arg FilterParams
 			&i.Description,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			// Scan the new Name fields (pointers handle NULLs automatically)
+			&i.UserName,
+			&i.PartyName,
+			&i.CategoryName,
 		); err != nil {
 			return nil, err
 		}
 		transactions = append(transactions, i)
-		helpers.LogInfo("db GetFilteredTransactions", "i", "transactions", transactions)
 	}
 	return transactions, nil
 }
@@ -191,6 +221,7 @@ func (db *DBStore) GetTransactionStats(ctx context.Context, arg FilterParams) (T
 	return stats, nil
 }
 
+// TODO, you can use the above funciton itself instead of below.
 func (db *DBStore) GetSingleTransaction(ctx context.Context, arg FilterParams) (Transaction, error) {
 	whereClause, args := db.buildWhereClause(arg)
 

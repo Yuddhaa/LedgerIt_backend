@@ -17,8 +17,8 @@ import (
 // after doing filtering at db level based on the query params passed
 func (h *Handler) GetTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	type resType struct {
-		Stats        db.TransactionStats `json:"stats"`
-		Transactions []db.Transaction    `json:"transactions"`
+		Stats        db.TransactionStats              `json:"stats"`
+		Transactions []db.GetFilteredTransactionsRows `json:"transactions"`
 	}
 	// **********************************************
 	// get all the data required for the filteing
