@@ -29,16 +29,17 @@ func NewDBStore(pool *pgxpool.Pool) *DBStore {
 
 // GetFilteredTransactionsParams refers to params required to build whereClause
 type FilterParams struct {
-	BusinessID pgtype.UUID          `json:"business_id"`
-	UserID     []pgtype.UUID        `json:"user_id"`
-	PartyID    []pgtype.UUID        `json:"party_id"`
-	CategoryID []pgtype.UUID        `json:"category_id"`
-	Mode       []string             `json:"mode"`
-	Direction  TransactionDirection `json:"direction"`
-	FromDate   time.Time            `json:"from_date"`
-	ToDate     time.Time            `json:"to_date"`
-	SortBy     string               `json:"sortBy"`
-	SortOrder  string               `json:"order"`
+	TransactionId pgtype.UUID          `json:"transaction_id"`
+	BusinessID    pgtype.UUID          `json:"business_id"`
+	UserID        []pgtype.UUID        `json:"user_id"`
+	PartyID       []pgtype.UUID        `json:"party_id"`
+	CategoryID    []pgtype.UUID        `json:"category_id"`
+	Mode          []string             `json:"mode"`
+	Direction     TransactionDirection `json:"direction"`
+	FromDate      time.Time            `json:"from_date"`
+	ToDate        time.Time            `json:"to_date"`
+	SortBy        string               `json:"sortBy"`
+	SortOrder     string               `json:"order"`
 }
 
 // buildWhereClause Helper: Builds the WHERE clause and Arguments
@@ -48,6 +49,12 @@ func (db *DBStore) buildWhereClause(arg FilterParams) (string, []any) {
 	query := "From transactions WHERE business_id = $1"
 	queryArgs := []any{arg.BusinessID}
 	count := 2
+
+	if arg.TransactionId.Valid {
+		query += fmt.Sprintf(" AND id = $%d", count)
+		queryArgs = append(queryArgs, arg.TransactionId)
+		count += 1
+	}
 
 	// build the query and args sequentially
 	if len(arg.UserID) > 0 {
@@ -182,4 +189,33 @@ func (db *DBStore) GetTransactionStats(ctx context.Context, arg FilterParams) (T
 	stats.NetBalance = stats.CashIn - stats.CashOut
 
 	return stats, nil
+}
+
+func (db *DBStore) GetSingleTransaction(ctx context.Context, arg FilterParams) (Transaction, error) {
+	whereClause, args := db.buildWhereClause(arg)
+
+	query := `SELECT * ` + whereClause
+	helpers.LogInfo("in maindb GetSingleTransaction", "", "query", query, "args:", args)
+
+	row := db.Pool.QueryRow(ctx, query, args...)
+
+	var transaction Transaction
+	err := row.Scan(
+		&transaction.ID,
+		&transaction.BusinessID,
+		&transaction.UserID,
+		&transaction.Amount,
+		&transaction.Direction,
+		&transaction.CategoryID,
+		&transaction.PartyID,
+		&transaction.Mode,
+		&transaction.ReceiptNo,
+		&transaction.Description,
+		&transaction.CreatedAt,
+		&transaction.UpdatedAt,
+	)
+	if err != nil {
+		return transaction, err
+	}
+	return transaction, nil
 }

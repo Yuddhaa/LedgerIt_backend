@@ -37,13 +37,14 @@ func (h *Handler) Routes() chi.Router {
 		r.Use(h.GetRole)
 		r.Post("/", h.AddTransactionsHandler)
 		r.Get("/", h.GetTransactionsHandler)
+		r.Get("/{tran_id}", h.GetSingleTransactionsHandler)
 	})
 	return r
 }
 
 // --- middlerware and helper funcitons
 
-// TransactionAuthMiddleware ba
+// TransactionAuthMiddleware
 func (h *Handler) TransactionAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 	})
@@ -83,8 +84,9 @@ func (h *Handler) GetRole(next http.Handler) http.Handler {
 		}
 		if role == db.BusinessRoleEmployee {
 			roleInt = 2
+		} else {
+			roleInt = 1
 		}
-		roleInt = 1
 
 		ctx := context.WithValue(r.Context(), "role", roleInt)
 		next.ServeHTTP(w, r.WithContext(ctx))

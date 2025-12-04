@@ -214,6 +214,8 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
 }
 
 // GetUserRole extract and returns user id form context
+// 1 - admin/creator
+// 2 - employee
 func GetUserRoleFromContext(w http.ResponseWriter, r *http.Request) (int, bool) {
 	role, ok := r.Context().Value("role").(int)
 	if !ok {
