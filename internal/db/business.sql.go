@@ -337,6 +337,34 @@ func (q *Queries) UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) 
 	return i, err
 }
 
+const updateBusinessMember = `-- name: UpdateBusinessMember :one
+UPDATE business_members
+SET role = $1
+WHERE user_id = $2 AND business_id = $3
+RETURNING id, user_id, business_id, role, current_balance, created_at
+`
+
+type UpdateBusinessMemberParams struct {
+	Role       BusinessRole `json:"role"`
+	UserID     pgtype.UUID  `json:"user_id"`
+	BusinessID pgtype.UUID  `json:"business_id"`
+}
+
+// used to update role in business_members
+func (q *Queries) UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error) {
+	row := q.db.QueryRow(ctx, updateBusinessMember, arg.Role, arg.UserID, arg.BusinessID)
+	var i BusinessMember
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.BusinessID,
+		&i.Role,
+		&i.CurrentBalance,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
 const updateBusinessMemberBalance = `-- name: UpdateBusinessMemberBalance :exec
 UPDATE business_members
 SET current_balance = current_balance + $1

@@ -71,6 +71,8 @@ type Querier interface {
 	ListUniquePartyPlacesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]string, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
+	// used to update role in business_members
+	UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error)
 	// used to update balance in transactions
 	UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error
 	// update a particular category

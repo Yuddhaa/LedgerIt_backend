@@ -46,6 +46,7 @@ func (h *Handler) Routes() chi.Router {
 		r.Group(func(r chi.Router) {
 			r.Use(h.GetRole) // for admin|creator related routes
 			r.Post("/members", h.AddMemberHandler)
+			r.Patch("/members", h.UpdateMemberHandler)
 			r.Patch("/", h.UpdateBusinessHandler)
 			r.Delete("/", h.DeleteBusinessHandler)
 		})
@@ -56,8 +57,9 @@ func (h *Handler) Routes() chi.Router {
 // Getrole returns int corresponding to the role as below
 // -1 - err
 // 0 - not a member => for these 2 automatically the middleware returns respective status code
-// 1 - admin/creator
+// 1 - creator
 // 2 - employee
+// 3 - admin
 func (h *Handler) GetRole(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		roleInt := -1
@@ -86,9 +88,12 @@ func (h *Handler) GetRole(next http.Handler) http.Handler {
 			return
 		}
 		if role == db.BusinessRoleEmployee {
-			roleInt = 2
+			roleInt = 2 // employee
+		} else if role == db.BusinessRoleAdmin {
+			roleInt = 3 // admin
+		} else {
+			roleInt = 1 // creator
 		}
-		roleInt = 1
 
 		ctx := context.WithValue(r.Context(), "role", roleInt)
 		next.ServeHTTP(w, r.WithContext(ctx))

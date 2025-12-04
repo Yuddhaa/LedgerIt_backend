@@ -86,6 +86,13 @@ UPDATE business_members
 SET current_balance = current_balance + $1
 WHERE user_id = $2 AND business_id = $3;
 
+-- used to update role in business_members
+-- name: UpdateBusinessMember :one
+UPDATE business_members
+SET role = $1
+WHERE user_id = $2 AND business_id = $3
+RETURNING *;
+
 -- used to delete a business
 -- name: DeleteBusiness :exec
 DELETE FROM businesses WHERE id = $1;
