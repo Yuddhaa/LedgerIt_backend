@@ -220,33 +220,3 @@ func (db *DBStore) GetTransactionStats(ctx context.Context, arg FilterParams) (T
 
 	return stats, nil
 }
-
-// TODO, you can use the above funciton itself instead of below.
-func (db *DBStore) GetSingleTransaction(ctx context.Context, arg FilterParams) (Transaction, error) {
-	whereClause, args := db.buildWhereClause(arg)
-
-	query := `SELECT * ` + whereClause
-	helpers.LogInfo("in maindb GetSingleTransaction", "", "query", query, "args:", args)
-
-	row := db.Pool.QueryRow(ctx, query, args...)
-
-	var transaction Transaction
-	err := row.Scan(
-		&transaction.ID,
-		&transaction.BusinessID,
-		&transaction.UserID,
-		&transaction.Amount,
-		&transaction.Direction,
-		&transaction.CategoryID,
-		&transaction.PartyID,
-		&transaction.Mode,
-		&transaction.ReceiptNo,
-		&transaction.Description,
-		&transaction.CreatedAt,
-		&transaction.UpdatedAt,
-	)
-	if err != nil {
-		return transaction, err
-	}
-	return transaction, nil
-}

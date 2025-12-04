@@ -1,20 +1,17 @@
 package transactions
 
 import (
-	"errors"
 	"net/http"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // GetSingleTransactionsHandler returns a single transaction based on the "tran_id" path parameter
 func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Request) {
 	type resType struct {
-		Transaction db.Transaction `json:"transaction"`
+		Transaction db.GetFilteredTransactionsRows `json:"transaction"`
 	}
 	// **********************************************8
 	// get the required ids
@@ -34,9 +31,9 @@ func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Re
 	// **********************************************8
 	// db call
 	// **********************************************8
-	transaction, err := h.db.GetSingleTransaction(r.Context(), filters)
+	transaction, err := h.db.GetFilteredTransactions(r.Context(), filters)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if len(transaction) == 0 {
 			helpers.RespondWithError(w, http.StatusNotFound, "transaction not found")
 			helpers.LogInfo("GetSingleTransactionsHandler", "transaction not found", "transactionId", transactionId, "businessId", businessId)
 			return
@@ -48,6 +45,9 @@ func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Re
 		return
 	}
 	userId, ok := auth.GetUserIdFromContext(w, r)
+	if !ok {
+		return
+	}
 	// **********************************************8
 	// if user is employee, return transaction only if transaction.UserId is same as loggedin userid
 	// **********************************************8
@@ -58,7 +58,7 @@ func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Re
 		if !ok {
 			return
 		}
-		if transaction.UserID.Bytes != userId.Bytes {
+		if transaction[0].UserID.Bytes != userId.Bytes {
 			helpers.RespondWithError(w, http.StatusForbidden, "cannot get this transaction")
 			helpers.LogInfo("GetSingleTransaction", "Unauthorized", "userId", userId, "businessId", businessId, "transactionId", transactionId)
 			return
@@ -68,7 +68,7 @@ func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Re
 	// **********************************************
 	// respond
 	// **********************************************
-	res := resType{Transaction: transaction}
+	res := resType{Transaction: transaction[0]}
 	helpers.RespondWithJSON(w, 200, res)
 	helpers.LogInfo("GetSingleTransaction", "success", "res", res)
 }
