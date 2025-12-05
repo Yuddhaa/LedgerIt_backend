@@ -73,6 +73,8 @@ type Querier interface {
 	ListPartiesByBusinessAndPlace(ctx context.Context, arg ListPartiesByBusinessAndPlaceParams) ([]Party, error)
 	// get all the unique places stored in parties table related to a businessId
 	ListUniquePartyPlacesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]string, error)
+	// get all active sessions/devices for a user
+	ListUserDevices(ctx context.Context, userID pgtype.UUID) ([]ListUserDevicesRow, error)
 	ListUsers(ctx context.Context) ([]User, error)
 	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
 	// used to update role in business_members

@@ -102,3 +102,47 @@ func (q *Queries) InsertRefreshToken(ctx context.Context, arg InsertRefreshToken
 	)
 	return i, err
 }
+
+const listUserDevices = `-- name: ListUserDevices :many
+SELECT 
+    id, 
+    device_info, 
+    created_at, 
+    expires_at 
+FROM refresh_tokens
+WHERE user_id = $1
+ORDER BY created_at DESC
+`
+
+type ListUserDevicesRow struct {
+	ID         pgtype.UUID        `json:"id"`
+	DeviceInfo pgtype.Text        `json:"device_info"`
+	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
+}
+
+// get all active sessions/devices for a user
+func (q *Queries) ListUserDevices(ctx context.Context, userID pgtype.UUID) ([]ListUserDevicesRow, error) {
+	rows, err := q.db.Query(ctx, listUserDevices, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []ListUserDevicesRow{}
+	for rows.Next() {
+		var i ListUserDevicesRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.DeviceInfo,
+			&i.CreatedAt,
+			&i.ExpiresAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

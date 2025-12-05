@@ -37,6 +37,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Put("/me", h.UpdateUserProfileHandler)
 	r.Get("/phone/{phone_no}", h.GetUserByPhone)
 	r.Get("/me", h.GetProfileHandler)
+	r.Get("/devices", h.GetLoggedInDevices)
 	return r
 }
 
