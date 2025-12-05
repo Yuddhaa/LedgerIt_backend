@@ -25,6 +25,8 @@ type Querier interface {
 	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
 	// used to delete a business
 	DeleteBusiness(ctx context.Context, id pgtype.UUID) error
+	// used to remove business member
+	DeleteBusinessMember(ctx context.Context, arg DeleteBusinessMemberParams) error
 	// delete a particular category
 	DeleteCategory(ctx context.Context, arg DeleteCategoryParams) (pgtype.UUID, error)
 	// delete a particular party
@@ -47,6 +49,8 @@ type Querier interface {
 	GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
+	// used to get a member details
+	GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error)
 	// get a particular party
 	GetParty(ctx context.Context, arg GetPartyParams) (Party, error)
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.

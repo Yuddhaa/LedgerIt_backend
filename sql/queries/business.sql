@@ -96,3 +96,11 @@ RETURNING *;
 -- used to delete a business
 -- name: DeleteBusiness :exec
 DELETE FROM businesses WHERE id = $1;
+
+-- used to remove business member
+-- name: DeleteBusinessMember :exec
+DELETE FROM business_members WHERE user_id = $1 AND business_id = $2;
+
+-- used to get a member details
+-- name: GetMemberRoleBalance :one
+Select role, current_balance FROM business_members WHERE user_id = $1 AND business_id = $2;

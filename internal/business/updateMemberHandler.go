@@ -25,6 +25,7 @@ func (h *Handler) UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
 	// Role 2 = Employee/Member. They cannot update anyone.
 	if requesterRole == 2 {
 		helpers.RespondWithError(w, http.StatusForbidden, "Access denied: Employees cannot update members")
+		helpers.LogError("UpdateMemberHandler", "Access denied: Employees cannot update members")
 		return
 	}
 

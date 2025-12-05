@@ -47,6 +47,7 @@ func (h *Handler) Routes() chi.Router {
 			r.Use(h.GetRole) // for admin|creator related routes
 			r.Post("/members", h.AddMemberHandler)
 			r.Patch("/members", h.UpdateMemberHandler)
+			r.Delete("/members/{member_id}", h.DeleteMemberHandler)
 			r.Patch("/", h.UpdateBusinessHandler)
 			r.Delete("/", h.DeleteBusinessHandler)
 		})

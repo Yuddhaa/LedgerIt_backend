@@ -97,6 +97,21 @@ func (q *Queries) DeleteBusiness(ctx context.Context, id pgtype.UUID) error {
 	return err
 }
 
+const deleteBusinessMember = `-- name: DeleteBusinessMember :exec
+DELETE FROM business_members WHERE user_id = $1 AND business_id = $2
+`
+
+type DeleteBusinessMemberParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// used to remove business member
+func (q *Queries) DeleteBusinessMember(ctx context.Context, arg DeleteBusinessMemberParams) error {
+	_, err := q.db.Exec(ctx, deleteBusinessMember, arg.UserID, arg.BusinessID)
+	return err
+}
+
 const getBusinessByID = `-- name: GetBusinessByID :one
 SELECT b.id, b.name, b.owner_id, b.created_at, b.updated_at,bm.user_id,bm.role,bm.current_balance 
 FROM businesses b
@@ -270,6 +285,28 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (B
 	var role BusinessRole
 	err := row.Scan(&role)
 	return role, err
+}
+
+const getMemberRoleBalance = `-- name: GetMemberRoleBalance :one
+Select role, current_balance FROM business_members WHERE user_id = $1 AND business_id = $2
+`
+
+type GetMemberRoleBalanceParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+type GetMemberRoleBalanceRow struct {
+	Role           BusinessRole   `json:"role"`
+	CurrentBalance pgtype.Numeric `json:"current_balance"`
+}
+
+// used to get a member details
+func (q *Queries) GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error) {
+	row := q.db.QueryRow(ctx, getMemberRoleBalance, arg.UserID, arg.BusinessID)
+	var i GetMemberRoleBalanceRow
+	err := row.Scan(&i.Role, &i.CurrentBalance)
+	return i, err
 }
 
 const getUserRole = `-- name: GetUserRole :one
