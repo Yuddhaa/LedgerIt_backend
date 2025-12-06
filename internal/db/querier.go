@@ -20,6 +20,7 @@ type Querier interface {
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	// add a new category
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
+	CreateEditRequest(ctx context.Context, arg CreateEditRequestParams) (TransactionEditRequest, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
 	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
@@ -56,6 +57,8 @@ type Querier interface {
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
+	// RETURNING id, created_at;
+	GetTransactionForUpdate(ctx context.Context, arg GetTransactionForUpdateParams) (Transaction, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
@@ -85,6 +88,7 @@ type Querier interface {
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
+	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
 	VerifyCategoryBelongsToBusiness(ctx context.Context, arg VerifyCategoryBelongsToBusinessParams) (bool, error)

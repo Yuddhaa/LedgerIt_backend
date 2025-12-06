@@ -53,3 +53,40 @@ FROM validation
 WHERE party_valid = true AND category_valid = true
     RETURNING *;
 -- RETURNING id, created_at;
+
+-- name: GetTransactionForUpdate :one
+SELECT * FROM transactions 
+WHERE id = $1 AND business_id = $2 
+FOR NO KEY UPDATE;
+
+-- name: UpdateTransaction :one
+UPDATE transactions
+SET
+    amount = $3,
+    direction = $4,
+    category_id = $5,
+    party_id = $6,
+    mode = $7,
+    receipt_no = $8,
+    description = $9,
+    updated_at = NOW()
+WHERE id = $1 AND business_id = $2
+RETURNING *;
+
+-- name: CreateEditRequest :one
+INSERT INTO transaction_edit_requests (
+    transaction_id,
+    requested_by_id,
+    type,
+    requested_changes,
+    reason,
+    status
+) VALUES (
+    $1, 
+    $2, 
+    'edit', 
+    sqlc.arg(requested_changes)::text::jsonb, -- <--- THE FIX
+    $3, 
+    'pending'
+)
+RETURNING id, transaction_id, requested_by_id, reviewed_by_id, status, type, requested_changes, reason, created_at, updated_at;

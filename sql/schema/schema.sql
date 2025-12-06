@@ -111,13 +111,20 @@ CREATE INDEX idx_transactions_category_id ON transactions(category_id);
 CREATE INDEX idx_transactions_party_id ON transactions(party_id);
 CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 
+-- Create the new ENUM type
+CREATE TYPE transaction_change_type AS ENUM ('edit', 'delete');
+
 -- transaction_edit_requests table
 CREATE TABLE transaction_edit_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    transaction_id UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    transaction_id UUID UNIQUE NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     requested_by_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     reviewed_by_id UUID REFERENCES users(id) ON DELETE SET NULL,
     status edit_request_status NOT NULL DEFAULT 'pending',
+    
+    -- New column added here
+    type transaction_change_type NOT NULL,
+
     requested_changes JSONB NOT NULL, -- JSONB is preferred over JSON
     reason TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -128,7 +135,8 @@ CREATE INDEX idx_transaction_edit_requests_transaction_id ON transaction_edit_re
 CREATE INDEX idx_transaction_edit_requests_requested_by_id ON transaction_edit_requests(requested_by_id);
 CREATE INDEX idx_transaction_edit_requests_reviewed_by_id ON transaction_edit_requests(reviewed_by_id);
 CREATE INDEX idx_transaction_edit_requests_status ON transaction_edit_requests(status);
-
+-- Optional: Index on the new type column if you plan to filter by it often (e.g. "show me all delete requests")
+CREATE INDEX idx_transaction_edit_requests_type ON transaction_edit_requests(type);
 -- deposits table
 CREATE TABLE deposits (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

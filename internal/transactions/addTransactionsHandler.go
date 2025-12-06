@@ -15,23 +15,14 @@ import (
 
 // AddTransactionsHandler creates a new transaction row
 func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request) {
-	type reqType struct {
-		Amount      string                  `json:"amount"`
-		Direction   db.TransactionDirection `json:"direction"`
-		CategoryID  string                  `json:"category_id"`
-		PartyID     string                  `json:"party_id"`
-		Mode        db.TransactionMode      `json:"mode"`
-		ReceiptNo   string                  `json:"receipt_no"`
-		Description string                  `json:"description"`
-	}
-	type resType struct {
-		Transaction db.Transaction `json:"transaction"`
-	}
-	var body reqType
+	var body tranReqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		helpers.LogInfo("AddTransactionsHandler", "failed to decode request body", "error", err)
 		return
+	}
+	type resType struct {
+		Transaction db.Transaction `json:"transaction"`
 	}
 	helpers.PrintJson("AddTransactionsHandler body", body)
 	// set up all the transactions column

@@ -11,6 +11,55 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const createEditRequest = `-- name: CreateEditRequest :one
+INSERT INTO transaction_edit_requests (
+    transaction_id,
+    requested_by_id,
+    type,
+    requested_changes,
+    reason,
+    status
+) VALUES (
+    $1, 
+    $2, 
+    'edit', 
+    $4::text::jsonb, -- <--- THE FIX
+    $3, 
+    'pending'
+)
+RETURNING id, transaction_id, requested_by_id, reviewed_by_id, status, type, requested_changes, reason, created_at, updated_at
+`
+
+type CreateEditRequestParams struct {
+	TransactionID    pgtype.UUID `json:"transaction_id"`
+	RequestedByID    pgtype.UUID `json:"requested_by_id"`
+	Reason           pgtype.Text `json:"reason"`
+	RequestedChanges string      `json:"requested_changes"`
+}
+
+func (q *Queries) CreateEditRequest(ctx context.Context, arg CreateEditRequestParams) (TransactionEditRequest, error) {
+	row := q.db.QueryRow(ctx, createEditRequest,
+		arg.TransactionID,
+		arg.RequestedByID,
+		arg.Reason,
+		arg.RequestedChanges,
+	)
+	var i TransactionEditRequest
+	err := row.Scan(
+		&i.ID,
+		&i.TransactionID,
+		&i.RequestedByID,
+		&i.ReviewedByID,
+		&i.Status,
+		&i.Type,
+		&i.RequestedChanges,
+		&i.Reason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const createTransactionWithValidation = `-- name: CreateTransactionWithValidation :one
 WITH validation AS (
     SELECT 
@@ -75,6 +124,96 @@ func (q *Queries) CreateTransactionWithValidation(ctx context.Context, arg Creat
 		arg.CategoryID,
 		arg.Amount,
 		arg.Direction,
+		arg.Mode,
+		arg.ReceiptNo,
+		arg.Description,
+	)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.BusinessID,
+		&i.UserID,
+		&i.Amount,
+		&i.Direction,
+		&i.CategoryID,
+		&i.PartyID,
+		&i.Mode,
+		&i.ReceiptNo,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getTransactionForUpdate = `-- name: GetTransactionForUpdate :one
+
+SELECT id, business_id, user_id, amount, direction, category_id, party_id, mode, receipt_no, description, created_at, updated_at FROM transactions 
+WHERE id = $1 AND business_id = $2 
+FOR NO KEY UPDATE
+`
+
+type GetTransactionForUpdateParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// RETURNING id, created_at;
+func (q *Queries) GetTransactionForUpdate(ctx context.Context, arg GetTransactionForUpdateParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, getTransactionForUpdate, arg.ID, arg.BusinessID)
+	var i Transaction
+	err := row.Scan(
+		&i.ID,
+		&i.BusinessID,
+		&i.UserID,
+		&i.Amount,
+		&i.Direction,
+		&i.CategoryID,
+		&i.PartyID,
+		&i.Mode,
+		&i.ReceiptNo,
+		&i.Description,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateTransaction = `-- name: UpdateTransaction :one
+UPDATE transactions
+SET
+    amount = $3,
+    direction = $4,
+    category_id = $5,
+    party_id = $6,
+    mode = $7,
+    receipt_no = $8,
+    description = $9,
+    updated_at = NOW()
+WHERE id = $1 AND business_id = $2
+RETURNING id, business_id, user_id, amount, direction, category_id, party_id, mode, receipt_no, description, created_at, updated_at
+`
+
+type UpdateTransactionParams struct {
+	ID          pgtype.UUID          `json:"id"`
+	BusinessID  pgtype.UUID          `json:"business_id"`
+	Amount      pgtype.Numeric       `json:"amount"`
+	Direction   TransactionDirection `json:"direction"`
+	CategoryID  pgtype.UUID          `json:"category_id"`
+	PartyID     pgtype.UUID          `json:"party_id"`
+	Mode        TransactionMode      `json:"mode"`
+	ReceiptNo   string               `json:"receipt_no"`
+	Description pgtype.Text          `json:"description"`
+}
+
+func (q *Queries) UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error) {
+	row := q.db.QueryRow(ctx, updateTransaction,
+		arg.ID,
+		arg.BusinessID,
+		arg.Amount,
+		arg.Direction,
+		arg.CategoryID,
+		arg.PartyID,
 		arg.Mode,
 		arg.ReceiptNo,
 		arg.Description,

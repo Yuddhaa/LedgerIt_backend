@@ -140,6 +140,48 @@ func (ns NullEditRequestStatus) Value() (driver.Value, error) {
 	return string(ns.EditRequestStatus), nil
 }
 
+type TransactionChangeType string
+
+const (
+	TransactionChangeTypeEdit   TransactionChangeType = "edit"
+	TransactionChangeTypeDelete TransactionChangeType = "delete"
+)
+
+func (e *TransactionChangeType) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = TransactionChangeType(s)
+	case string:
+		*e = TransactionChangeType(s)
+	default:
+		return fmt.Errorf("unsupported scan type for TransactionChangeType: %T", src)
+	}
+	return nil
+}
+
+type NullTransactionChangeType struct {
+	TransactionChangeType TransactionChangeType `json:"transaction_change_type"`
+	Valid                 bool                  `json:"valid"` // Valid is true if TransactionChangeType is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullTransactionChangeType) Scan(value interface{}) error {
+	if value == nil {
+		ns.TransactionChangeType, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.TransactionChangeType.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullTransactionChangeType) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.TransactionChangeType), nil
+}
+
 type TransactionDirection string
 
 const (
@@ -297,15 +339,16 @@ type TransactionCategory struct {
 }
 
 type TransactionEditRequest struct {
-	ID               pgtype.UUID        `json:"id"`
-	TransactionID    pgtype.UUID        `json:"transaction_id"`
-	RequestedByID    pgtype.UUID        `json:"requested_by_id"`
-	ReviewedByID     pgtype.UUID        `json:"reviewed_by_id"`
-	Status           EditRequestStatus  `json:"status"`
-	RequestedChanges []byte             `json:"requested_changes"`
-	Reason           pgtype.Text        `json:"reason"`
-	CreatedAt        pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt        pgtype.Timestamptz `json:"updated_at"`
+	ID               pgtype.UUID           `json:"id"`
+	TransactionID    pgtype.UUID           `json:"transaction_id"`
+	RequestedByID    pgtype.UUID           `json:"requested_by_id"`
+	ReviewedByID     pgtype.UUID           `json:"reviewed_by_id"`
+	Status           EditRequestStatus     `json:"status"`
+	Type             TransactionChangeType `json:"type"`
+	RequestedChanges []byte                `json:"requested_changes"`
+	Reason           pgtype.Text           `json:"reason"`
+	CreatedAt        pgtype.Timestamptz    `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz    `json:"updated_at"`
 }
 
 type User struct {
