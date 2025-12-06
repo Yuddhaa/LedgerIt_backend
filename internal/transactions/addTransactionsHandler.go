@@ -95,7 +95,7 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	tx, err := h.db.Pool.Begin(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "server error")
-		helpers.LogError("AddTransactionsHandler", "failed to begin tx", "err", err)
+		helpers.LogError("AddTransactionsHandler", "failed to begin tx", "err", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -122,7 +122,7 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 		return
 	} else if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Failed to create transaction")
-		helpers.LogError("AddTx", "Insert failed", "err", err)
+		helpers.LogError("AddTx", "Insert failed", "err", err.Error())
 		return
 	}
 	// -------------------------------------------------------------------------

@@ -57,6 +57,10 @@ type Querier interface {
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
+	// GetTransactionApprovals returns approvals list based on filters
+	// Join Party: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+	// Join Category: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+	GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error)
 	// RETURNING id, created_at;
 	GetTransactionForUpdate(ctx context.Context, arg GetTransactionForUpdateParams) (Transaction, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)

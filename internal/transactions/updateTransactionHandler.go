@@ -19,7 +19,7 @@ func (h *Handler) UpdateTransactionHandler(w http.ResponseWriter, r *http.Reques
 	var body tranReqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
-		helpers.LogError("UpdateTransactionHandler", "json decode error", "err", err)
+		helpers.LogError("UpdateTransactionHandler", "json decode error", "err", err.Error())
 		return
 	}
 
@@ -50,7 +50,7 @@ func (h *Handler) UpdateTransactionHandler(w http.ResponseWriter, r *http.Reques
 	tx, err := h.db.Pool.Begin(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Server error")
-		helpers.LogError("UpdateTransactionHandler", "failed to begin tx", "err", err)
+		helpers.LogError("UpdateTransactionHandler", "failed to begin tx", "err", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context()) // Safety rollback
@@ -122,14 +122,14 @@ func (h *Handler) processEmployeeEditRequest(r *http.Request, w http.ResponseWri
 			helpers.RespondWithError(w, http.StatusConflict, "Edit request for this transaction already exists")
 			return
 		}
-		helpers.LogError("UpdateTransactionHandler", "error creating edit request", "err", err)
+		helpers.LogError("UpdateTransactionHandler", "error creating edit request", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
 
 	// 3. COMMIT (Must happen before response)
 	if err := tx.Commit(r.Context()); err != nil {
-		helpers.LogError("UpdateTransactionHandler", "commit failed", "err", err)
+		helpers.LogError("UpdateTransactionHandler", "commit failed", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Commit failed")
 		return
 	}
@@ -191,7 +191,7 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 		Description: pgtype.Text{String: body.Description, Valid: body.Description != ""},
 	})
 	if err != nil {
-		helpers.LogError("UpdateTransactionHandler", "update failed", "err", err)
+		helpers.LogError("UpdateTransactionHandler", "update failed", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Update failed")
 		return
 	}
@@ -232,7 +232,7 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 			BusinessID:     businessID,
 		})
 		if err != nil {
-			helpers.LogError("UpdateTransactionHandler", "balance update failed", "err", err)
+			helpers.LogError("UpdateTransactionHandler", "balance update failed", "err", err.Error())
 			helpers.RespondWithError(w, http.StatusInternalServerError, "Balance update failed")
 			return
 		}
@@ -240,7 +240,7 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 
 	// 6. COMMIT (Must happen before response)
 	if err := tx.Commit(r.Context()); err != nil {
-		helpers.LogError("UpdateTransactionHandler", "commit failed", "err", err)
+		helpers.LogError("UpdateTransactionHandler", "commit failed", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Commit failed")
 		return
 	}

@@ -146,6 +146,125 @@ func (q *Queries) CreateTransactionWithValidation(ctx context.Context, arg Creat
 	return i, err
 }
 
+const getTransactionApprovals = `-- name: GetTransactionApprovals :many
+SELECT 
+    ter.id,
+    ter.transaction_id,
+    ter.type,
+    ter.status,
+    ter.requested_changes, -- Cast to text for Go
+    ter.reason,
+    ter.created_at,
+    ter.updated_at,
+    -- Requestor Details
+    req_u.id AS requested_by_id,
+    req_u.name AS requested_by_name,
+    -- Reviewer Details
+    rev_u.id AS reviewed_by_id,
+    rev_u.name AS reviewed_by_name,
+    -- NEW: Extracted Names from JSONB IDs
+    p.name AS party_name,
+    c.name AS category_name
+FROM transaction_edit_requests ter
+JOIN transactions t ON ter.transaction_id = t.id
+JOIN users req_u ON ter.requested_by_id = req_u.id
+LEFT JOIN users rev_u ON ter.reviewed_by_id = rev_u.id
+LEFT JOIN parties p ON p.id = NULLIF(ter.requested_changes->>'party_id', '')::uuid
+LEFT JOIN transaction_categories c ON c.id = NULLIF(ter.requested_changes->>'category_id', '')::uuid
+WHERE 
+    t.business_id = $1
+    AND (
+        $2::UUID[] IS NULL 
+        OR ter.requested_by_id = ANY($2::UUID[])
+    )
+    AND (
+        $3::text = '' OR ter.status::text = $3
+    )
+    AND (
+        $4::text = '' OR ter.type::text = $4
+    )
+    AND (
+        $5::TIMESTAMPTZ IS NULL 
+        OR ter.created_at >= $5
+    )
+    AND (
+        $6::TIMESTAMPTZ IS NULL 
+        OR ter.created_at <= $6
+    )
+ORDER BY ter.created_at DESC
+`
+
+type GetTransactionApprovalsParams struct {
+	BusinessID     pgtype.UUID        `json:"business_id"`
+	RequestedByIds []pgtype.UUID      `json:"requested_by_ids"`
+	Status         string             `json:"status"`
+	Type           string             `json:"type"`
+	FromDate       pgtype.Timestamptz `json:"from_date"`
+	ToDate         pgtype.Timestamptz `json:"to_date"`
+}
+
+type GetTransactionApprovalsRow struct {
+	ID               pgtype.UUID           `json:"id"`
+	TransactionID    pgtype.UUID           `json:"transaction_id"`
+	Type             TransactionChangeType `json:"type"`
+	Status           EditRequestStatus     `json:"status"`
+	RequestedChanges []byte                `json:"requested_changes"`
+	Reason           pgtype.Text           `json:"reason"`
+	CreatedAt        pgtype.Timestamptz    `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz    `json:"updated_at"`
+	RequestedByID    pgtype.UUID           `json:"requested_by_id"`
+	RequestedByName  pgtype.Text           `json:"requested_by_name"`
+	ReviewedByID     pgtype.UUID           `json:"reviewed_by_id"`
+	ReviewedByName   pgtype.Text           `json:"reviewed_by_name"`
+	PartyName        pgtype.Text           `json:"party_name"`
+	CategoryName     pgtype.Text           `json:"category_name"`
+}
+
+// GetTransactionApprovals returns approvals list based on filters
+// Join Party: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+// Join Category: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+func (q *Queries) GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error) {
+	rows, err := q.db.Query(ctx, getTransactionApprovals,
+		arg.BusinessID,
+		arg.RequestedByIds,
+		arg.Status,
+		arg.Type,
+		arg.FromDate,
+		arg.ToDate,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []GetTransactionApprovalsRow{}
+	for rows.Next() {
+		var i GetTransactionApprovalsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TransactionID,
+			&i.Type,
+			&i.Status,
+			&i.RequestedChanges,
+			&i.Reason,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RequestedByID,
+			&i.RequestedByName,
+			&i.ReviewedByID,
+			&i.ReviewedByName,
+			&i.PartyName,
+			&i.CategoryName,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTransactionForUpdate = `-- name: GetTransactionForUpdate :one
 
 SELECT id, business_id, user_id, amount, direction, category_id, party_id, mode, receipt_no, description, created_at, updated_at FROM transactions 

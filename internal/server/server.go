@@ -68,7 +68,7 @@ func (s *Server) setupRouter() {
 	authHandler, err := auth.NewHandler(s.db, s.pool, s.logger)
 	if err != nil {
 		// This is a fatal error during startup, so we log and exit.
-		helpers.LogError("setupRouter", "error in intialising authHandler", "err", err)
+		helpers.LogError("setupRouter", "error in intialising authHandler", "err", err.Error())
 		os.Exit(1)
 	}
 	userHandler := users.NewHandler(s.db, s.pool, s.logger)
