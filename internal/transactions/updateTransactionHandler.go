@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"LedgerIt/internal/auth"
@@ -195,6 +196,7 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Update failed")
 		return
 	}
+	helpers.PrintJson("updatedTran", updatedTran)
 
 	// 4. Calculate Balance Adjustment (Reverse Old, Apply New)
 	oldVal, _ := oldTran.Amount.Float64Value()
@@ -221,11 +223,18 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 	}
 
 	// 5. Update Balance (If needed)
+	helpers.PrintJson("balanceDelta", balanceDelta)
 	if balanceDelta != 0 {
 		var deltaNumeric pgtype.Numeric
-		deltaNumeric.Scan(balanceDelta)
+		if err := deltaNumeric.Scan(fmt.Sprintf("%.2f", balanceDelta)); err != nil {
+			helpers.LogError("UpdateTransactionHandler", "deltaNumeric scan error", "err", err.Error())
+			helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
+			return
+		}
 
+		helpers.PrintJson("deltaNumeric", deltaNumeric)
 		// Note: We update the balance of the ORIGINAL creator (oldTran.UserID)
+		helpers.PrintJson("", "updating UpdateBusinessMemberBalance")
 		err = qtx.UpdateBusinessMemberBalance(r.Context(), db.UpdateBusinessMemberBalanceParams{
 			CurrentBalance: deltaNumeric, // Using Amount based on SQL logic (+ $1)
 			UserID:         oldTran.UserID,
@@ -236,6 +245,7 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 			helpers.RespondWithError(w, http.StatusInternalServerError, "Balance update failed")
 			return
 		}
+		helpers.PrintJson("", "updating UpdateBusinessMemberBalance done")
 	}
 
 	// 6. COMMIT (Must happen before response)

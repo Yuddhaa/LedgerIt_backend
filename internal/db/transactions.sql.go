@@ -152,7 +152,7 @@ SELECT
     ter.transaction_id,
     ter.type,
     ter.status,
-    ter.requested_changes, -- Cast to text for Go
+    ter.requested_changes::text AS requested_changes,
     ter.reason,
     ter.created_at,
     ter.updated_at,
@@ -162,15 +162,34 @@ SELECT
     -- Reviewer Details
     rev_u.id AS reviewed_by_id,
     rev_u.name AS reviewed_by_name,
-    -- NEW: Extracted Names from JSONB IDs
-    p.name AS party_name,
-    c.name AS category_name
+    -- Requested Changes Names (from JSON)
+    p.name AS req_party_name,
+    c.name AS req_category_name,
+    
+    -- NEW: Original Transaction Data
+    t.amount AS org_amount,
+    t.direction AS org_direction,
+    t.mode AS org_mode,
+    t.receipt_no AS org_receipt_no,
+    t.description AS org_description,
+    -- Original Party (Join 'op')
+    t.party_id AS org_party_id,
+    op.name AS org_party_name,
+    -- Original Category (Join 'oc')
+    t.category_id AS org_category_id,
+    oc.name AS org_category_name
+
 FROM transaction_edit_requests ter
 JOIN transactions t ON ter.transaction_id = t.id
 JOIN users req_u ON ter.requested_by_id = req_u.id
 LEFT JOIN users rev_u ON ter.reviewed_by_id = rev_u.id
+
 LEFT JOIN parties p ON p.id = NULLIF(ter.requested_changes->>'party_id', '')::uuid
 LEFT JOIN transaction_categories c ON c.id = NULLIF(ter.requested_changes->>'category_id', '')::uuid
+
+JOIN parties op ON t.party_id = op.id
+LEFT JOIN transaction_categories oc ON t.category_id = oc.id
+
 WHERE 
     t.business_id = $1
     AND (
@@ -208,7 +227,7 @@ type GetTransactionApprovalsRow struct {
 	TransactionID    pgtype.UUID           `json:"transaction_id"`
 	Type             TransactionChangeType `json:"type"`
 	Status           EditRequestStatus     `json:"status"`
-	RequestedChanges []byte                `json:"requested_changes"`
+	RequestedChanges string                `json:"requested_changes"`
 	Reason           pgtype.Text           `json:"reason"`
 	CreatedAt        pgtype.Timestamptz    `json:"created_at"`
 	UpdatedAt        pgtype.Timestamptz    `json:"updated_at"`
@@ -216,13 +235,21 @@ type GetTransactionApprovalsRow struct {
 	RequestedByName  pgtype.Text           `json:"requested_by_name"`
 	ReviewedByID     pgtype.UUID           `json:"reviewed_by_id"`
 	ReviewedByName   pgtype.Text           `json:"reviewed_by_name"`
-	PartyName        pgtype.Text           `json:"party_name"`
-	CategoryName     pgtype.Text           `json:"category_name"`
+	ReqPartyName     pgtype.Text           `json:"req_party_name"`
+	ReqCategoryName  pgtype.Text           `json:"req_category_name"`
+	OrgAmount        pgtype.Numeric        `json:"org_amount"`
+	OrgDirection     TransactionDirection  `json:"org_direction"`
+	OrgMode          TransactionMode       `json:"org_mode"`
+	OrgReceiptNo     string                `json:"org_receipt_no"`
+	OrgDescription   pgtype.Text           `json:"org_description"`
+	OrgPartyID       pgtype.UUID           `json:"org_party_id"`
+	OrgPartyName     string                `json:"org_party_name"`
+	OrgCategoryID    pgtype.UUID           `json:"org_category_id"`
+	OrgCategoryName  pgtype.Text           `json:"org_category_name"`
 }
 
-// GetTransactionApprovals returns approvals list based on filters
-// Join Party: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
-// Join Category: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+// 1. Joins for REQUESTED changes (from JSON)
+// 2. NEW: Joins for ORIGINAL transaction (from Columns)
 func (q *Queries) GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error) {
 	rows, err := q.db.Query(ctx, getTransactionApprovals,
 		arg.BusinessID,
@@ -252,8 +279,17 @@ func (q *Queries) GetTransactionApprovals(ctx context.Context, arg GetTransactio
 			&i.RequestedByName,
 			&i.ReviewedByID,
 			&i.ReviewedByName,
-			&i.PartyName,
-			&i.CategoryName,
+			&i.ReqPartyName,
+			&i.ReqCategoryName,
+			&i.OrgAmount,
+			&i.OrgDirection,
+			&i.OrgMode,
+			&i.OrgReceiptNo,
+			&i.OrgDescription,
+			&i.OrgPartyID,
+			&i.OrgPartyName,
+			&i.OrgCategoryID,
+			&i.OrgCategoryName,
 		); err != nil {
 			return nil, err
 		}
@@ -294,6 +330,144 @@ func (q *Queries) GetTransactionForUpdate(ctx context.Context, arg GetTransactio
 		&i.Description,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const patchEditRequest = `-- name: PatchEditRequest :one
+WITH updated_row AS (
+    UPDATE transaction_edit_requests ter
+    SET
+        requested_changes = $6::text::jsonb,
+        reason = $3,
+        status = $4,
+        reviewed_by_id = $5,
+        updated_at = NOW()
+    WHERE
+        ter.id = $1
+        -- Security Check:
+        AND ($2::uuid IS NULL OR ter.requested_by_id = $2)
+        AND ter.status = 'pending'
+        AND ter.type = 'edit'
+    -- Explicitly list columns to prevent sqlc ambiguity error
+    RETURNING 
+        ter.id, ter.transaction_id, ter.requested_by_id, ter.reviewed_by_id, 
+        ter.status, ter.type, ter.requested_changes, ter.reason, 
+        ter.created_at, ter.updated_at
+)
+SELECT 
+    ur.id, 
+    ur.transaction_id, 
+    ur.requested_by_id, 
+    ur.reviewed_by_id, 
+    ur.status, 
+    ur.type, 
+    ur.requested_changes::text AS requested_changes, -- Cast to text for Go string
+    ur.reason, 
+    ur.created_at, 
+    ur.updated_at,
+    -- Join User Names
+    req_u.name AS requested_by_name,
+    rev_u.name AS reviewed_by_name,
+    -- Join Requested Party/Category from JSON
+    p.name AS req_party_name,
+    c.name AS req_category_name,
+
+    -- NEW: Original Transaction Data
+    t.amount AS org_amount,
+    t.direction AS org_direction,
+    t.mode AS org_mode,
+    t.receipt_no AS org_receipt_no,
+    t.description AS org_description,
+    -- Original Party (Join 'op')
+    t.party_id AS org_party_id,
+    op.name AS org_party_name,
+    -- Original Category (Join 'oc')
+    t.category_id AS org_category_id,
+    oc.name AS org_category_name
+
+FROM updated_row ur
+JOIN users req_u ON ur.requested_by_id = req_u.id
+LEFT JOIN users rev_u ON ur.reviewed_by_id = rev_u.id
+LEFT JOIN parties p ON p.id = NULLIF(ur.requested_changes->>'party_id', '')::uuid
+LEFT JOIN transaction_categories c ON c.id = NULLIF(ur.requested_changes->>'category_id', '')::uuid
+JOIN transactions t ON ur.transaction_id = t.id
+JOIN parties op ON t.party_id = op.id
+LEFT JOIN transaction_categories oc ON t.category_id = oc.id
+`
+
+type PatchEditRequestParams struct {
+	ID               pgtype.UUID       `json:"id"`
+	Column2          pgtype.UUID       `json:"column_2"`
+	Reason           pgtype.Text       `json:"reason"`
+	Status           EditRequestStatus `json:"status"`
+	ReviewedByID     pgtype.UUID       `json:"reviewed_by_id"`
+	RequestedChanges string            `json:"requested_changes"`
+}
+
+type PatchEditRequestRow struct {
+	ID               pgtype.UUID           `json:"id"`
+	TransactionID    pgtype.UUID           `json:"transaction_id"`
+	RequestedByID    pgtype.UUID           `json:"requested_by_id"`
+	ReviewedByID     pgtype.UUID           `json:"reviewed_by_id"`
+	Status           EditRequestStatus     `json:"status"`
+	Type             TransactionChangeType `json:"type"`
+	RequestedChanges string                `json:"requested_changes"`
+	Reason           pgtype.Text           `json:"reason"`
+	CreatedAt        pgtype.Timestamptz    `json:"created_at"`
+	UpdatedAt        pgtype.Timestamptz    `json:"updated_at"`
+	RequestedByName  pgtype.Text           `json:"requested_by_name"`
+	ReviewedByName   pgtype.Text           `json:"reviewed_by_name"`
+	ReqPartyName     pgtype.Text           `json:"req_party_name"`
+	ReqCategoryName  pgtype.Text           `json:"req_category_name"`
+	OrgAmount        pgtype.Numeric        `json:"org_amount"`
+	OrgDirection     TransactionDirection  `json:"org_direction"`
+	OrgMode          TransactionMode       `json:"org_mode"`
+	OrgReceiptNo     string                `json:"org_receipt_no"`
+	OrgDescription   pgtype.Text           `json:"org_description"`
+	OrgPartyID       pgtype.UUID           `json:"org_party_id"`
+	OrgPartyName     string                `json:"org_party_name"`
+	OrgCategoryID    pgtype.UUID           `json:"org_category_id"`
+	OrgCategoryName  pgtype.Text           `json:"org_category_name"`
+}
+
+// Join Users
+// Join Requested Changes (from JSON)
+// NEW: Join Original Transaction
+func (q *Queries) PatchEditRequest(ctx context.Context, arg PatchEditRequestParams) (PatchEditRequestRow, error) {
+	row := q.db.QueryRow(ctx, patchEditRequest,
+		arg.ID,
+		arg.Column2,
+		arg.Reason,
+		arg.Status,
+		arg.ReviewedByID,
+		arg.RequestedChanges,
+	)
+	var i PatchEditRequestRow
+	err := row.Scan(
+		&i.ID,
+		&i.TransactionID,
+		&i.RequestedByID,
+		&i.ReviewedByID,
+		&i.Status,
+		&i.Type,
+		&i.RequestedChanges,
+		&i.Reason,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RequestedByName,
+		&i.ReviewedByName,
+		&i.ReqPartyName,
+		&i.ReqCategoryName,
+		&i.OrgAmount,
+		&i.OrgDirection,
+		&i.OrgMode,
+		&i.OrgReceiptNo,
+		&i.OrgDescription,
+		&i.OrgPartyID,
+		&i.OrgPartyName,
+		&i.OrgCategoryID,
+		&i.OrgCategoryName,
 	)
 	return i, err
 }

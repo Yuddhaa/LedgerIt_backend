@@ -57,9 +57,8 @@ type Querier interface {
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
-	// GetTransactionApprovals returns approvals list based on filters
-	// Join Party: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
-	// Join Category: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+	// 1. Joins for REQUESTED changes (from JSON)
+	// 2. NEW: Joins for ORIGINAL transaction (from Columns)
 	GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error)
 	// RETURNING id, created_at;
 	GetTransactionForUpdate(ctx context.Context, arg GetTransactionForUpdateParams) (Transaction, error)
@@ -83,6 +82,10 @@ type Querier interface {
 	// get all active sessions/devices for a user
 	ListUserDevices(ctx context.Context, userID pgtype.UUID) ([]ListUserDevicesRow, error)
 	ListUsers(ctx context.Context) ([]User, error)
+	// Join Users
+	// Join Requested Changes (from JSON)
+	// NEW: Join Original Transaction
+	PatchEditRequest(ctx context.Context, arg PatchEditRequestParams) (PatchEditRequestRow, error)
 	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
 	// used to update role in business_members
 	UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error)

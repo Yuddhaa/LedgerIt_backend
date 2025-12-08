@@ -33,6 +33,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Patch("/{tran_id}", h.UpdateTransactionHandler)
 	// approvals related
 	r.Get("/approvals", h.GetApprovalsHandler)
+	r.Patch("/approvals/{approval_id}", h.PatchApprovalHandler)
 	return r
 }
 

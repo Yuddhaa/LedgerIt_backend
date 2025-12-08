@@ -73,7 +73,6 @@ CREATE INDEX idx_parties_business_id_place ON parties(business_id, place);
 -- transaction ENUM types
 CREATE TYPE transaction_direction AS ENUM ('in', 'out');
 CREATE TYPE transaction_mode AS ENUM ('online', 'cash', 'cheque');
-CREATE TYPE edit_request_status AS ENUM ('pending', 'approved', 'rejected');
 CREATE TYPE deposit_status AS ENUM ('pending', 'approved', 'rejected');
 
 -- transaction_categories table
@@ -113,6 +112,7 @@ CREATE INDEX idx_transactions_created_at ON transactions(created_at DESC);
 
 -- Create the new ENUM type
 CREATE TYPE transaction_change_type AS ENUM ('edit', 'delete');
+CREATE TYPE edit_request_status AS ENUM ('pending', 'approved', 'rejected');
 
 -- transaction_edit_requests table
 CREATE TABLE transaction_edit_requests (

@@ -91,14 +91,13 @@ INSERT INTO transaction_edit_requests (
 )
 RETURNING id, transaction_id, requested_by_id, reviewed_by_id, status, type, requested_changes, reason, created_at, updated_at;
 
--- GetTransactionApprovals returns approvals list based on filters
 -- name: GetTransactionApprovals :many
 SELECT 
     ter.id,
     ter.transaction_id,
     ter.type,
     ter.status,
-    ter.requested_changes, -- Cast to text for Go
+    ter.requested_changes::text AS requested_changes,
     ter.reason,
     ter.created_at,
     ter.updated_at,
@@ -108,17 +107,36 @@ SELECT
     -- Reviewer Details
     rev_u.id AS reviewed_by_id,
     rev_u.name AS reviewed_by_name,
-    -- NEW: Extracted Names from JSONB IDs
-    p.name AS party_name,
-    c.name AS category_name
+    -- Requested Changes Names (from JSON)
+    p.name AS req_party_name,
+    c.name AS req_category_name,
+    
+    -- NEW: Original Transaction Data
+    t.amount AS org_amount,
+    t.direction AS org_direction,
+    t.mode AS org_mode,
+    t.receipt_no AS org_receipt_no,
+    t.description AS org_description,
+    -- Original Party (Join 'op')
+    t.party_id AS org_party_id,
+    op.name AS org_party_name,
+    -- Original Category (Join 'oc')
+    t.category_id AS org_category_id,
+    oc.name AS org_category_name
+
 FROM transaction_edit_requests ter
 JOIN transactions t ON ter.transaction_id = t.id
 JOIN users req_u ON ter.requested_by_id = req_u.id
 LEFT JOIN users rev_u ON ter.reviewed_by_id = rev_u.id
--- Join Party: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
+
+-- 1. Joins for REQUESTED changes (from JSON)
 LEFT JOIN parties p ON p.id = NULLIF(ter.requested_changes->>'party_id', '')::uuid
--- Join Category: Extract ID from JSON -> Handle Empty String -> Cast to UUID -> Join
 LEFT JOIN transaction_categories c ON c.id = NULLIF(ter.requested_changes->>'category_id', '')::uuid
+
+-- 2. NEW: Joins for ORIGINAL transaction (from Columns)
+JOIN parties op ON t.party_id = op.id
+LEFT JOIN transaction_categories oc ON t.category_id = oc.id
+
 WHERE 
     t.business_id = @business_id
     AND (
@@ -140,3 +158,67 @@ WHERE
         OR ter.created_at <= @to_date
     )
 ORDER BY ter.created_at DESC;
+
+-- name: PatchEditRequest :one
+WITH updated_row AS (
+    UPDATE transaction_edit_requests ter
+    SET
+        requested_changes = sqlc.arg(requested_changes)::text::jsonb,
+        reason = $3,
+        status = $4,
+        reviewed_by_id = $5,
+        updated_at = NOW()
+    WHERE
+        ter.id = $1
+        -- Security Check:
+        AND ($2::uuid IS NULL OR ter.requested_by_id = $2)
+        AND ter.status = 'pending'
+        AND ter.type = 'edit'
+    -- Explicitly list columns to prevent sqlc ambiguity error
+    RETURNING 
+        ter.id, ter.transaction_id, ter.requested_by_id, ter.reviewed_by_id, 
+        ter.status, ter.type, ter.requested_changes, ter.reason, 
+        ter.created_at, ter.updated_at
+)
+SELECT 
+    ur.id, 
+    ur.transaction_id, 
+    ur.requested_by_id, 
+    ur.reviewed_by_id, 
+    ur.status, 
+    ur.type, 
+    ur.requested_changes::text AS requested_changes, -- Cast to text for Go string
+    ur.reason, 
+    ur.created_at, 
+    ur.updated_at,
+    -- Join User Names
+    req_u.name AS requested_by_name,
+    rev_u.name AS reviewed_by_name,
+    -- Join Requested Party/Category from JSON
+    p.name AS req_party_name,
+    c.name AS req_category_name,
+
+    -- NEW: Original Transaction Data
+    t.amount AS org_amount,
+    t.direction AS org_direction,
+    t.mode AS org_mode,
+    t.receipt_no AS org_receipt_no,
+    t.description AS org_description,
+    -- Original Party (Join 'op')
+    t.party_id AS org_party_id,
+    op.name AS org_party_name,
+    -- Original Category (Join 'oc')
+    t.category_id AS org_category_id,
+    oc.name AS org_category_name
+
+FROM updated_row ur
+-- Join Users
+JOIN users req_u ON ur.requested_by_id = req_u.id
+LEFT JOIN users rev_u ON ur.reviewed_by_id = rev_u.id
+-- Join Requested Changes (from JSON)
+LEFT JOIN parties p ON p.id = NULLIF(ur.requested_changes->>'party_id', '')::uuid
+LEFT JOIN transaction_categories c ON c.id = NULLIF(ur.requested_changes->>'category_id', '')::uuid
+-- NEW: Join Original Transaction
+JOIN transactions t ON ur.transaction_id = t.id
+JOIN parties op ON t.party_id = op.id
+LEFT JOIN transaction_categories oc ON t.category_id = oc.id;
