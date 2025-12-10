@@ -1,6 +1,8 @@
 package transactions
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -12,8 +14,28 @@ import (
 )
 
 func (h *Handler) GetApprovalsHandler(w http.ResponseWriter, r *http.Request) {
+	type transaction struct {
+		tranReqType
+		CategoryName *string `json:"category_name"`
+		PartyName    *string `json:"party_name"`
+	}
+	type dbResults struct {
+		ID               pgtype.UUID              `json:"id"`
+		TransactionID    pgtype.UUID              `json:"transaction_id"`
+		Type             db.TransactionChangeType `json:"type"`
+		Status           db.EditRequestStatus     `json:"status"`
+		Reason           pgtype.Text              `json:"reason"`
+		CreatedAt        pgtype.Timestamptz       `json:"created_at"`
+		UpdatedAt        pgtype.Timestamptz       `json:"updated_at"`
+		RequestedByID    pgtype.UUID              `json:"requested_by_id"`
+		RequestedByName  pgtype.Text              `json:"requested_by_name"`
+		ReviewedByID     pgtype.UUID              `json:"reviewed_by_id"`
+		ReviewedByName   pgtype.Text              `json:"reviewed_by_name"`
+		RequestedChanges transaction              `json:"requested_changes"`
+		Original         transaction              `json:"original"`
+	}
 	type resType struct {
-		Requests []db.GetTransactionApprovalsRow `json:"requests"`
+		Requests []dbResults `json:"requests"`
 	}
 	// 1. Auth Check (Admin/Creator only)
 	role, ok := auth.GetUserRoleFromContext(w, r)
@@ -85,15 +107,54 @@ func (h *Handler) GetApprovalsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ensure we return [] instead of null in JSON if no rows found
-	if rows == nil {
-		rows = []db.GetTransactionApprovalsRow{}
+	response := make([]dbResults, len(rows))
+	for i := range rows {
+		// A. Map Basic Fields
+		response[i].ID = rows[i].ID
+		response[i].TransactionID = rows[i].TransactionID
+		response[i].Type = rows[i].Type
+		response[i].Status = rows[i].Status
+		response[i].Reason = rows[i].Reason
+		response[i].CreatedAt = rows[i].CreatedAt
+		response[i].UpdatedAt = rows[i].UpdatedAt
+		response[i].RequestedByID = rows[i].RequestedByID
+		response[i].RequestedByName = rows[i].RequestedByName
+		response[i].ReviewedByID = rows[i].ReviewedByID
+		response[i].ReviewedByName = rows[i].ReviewedByName
+
+		// B. Map Original Transaction (From SQL Columns)
+		// Convert Numeric Amount to String
+		orgAmountFloat, _ := rows[i].OrgAmount.Float64Value()
+		orgAmountStr := fmt.Sprintf("%.2f", orgAmountFloat.Float64)
+
+		response[i].Original = transaction{
+			tranReqType: tranReqType{
+				Amount:      orgAmountStr,
+				Direction:   rows[i].OrgDirection,
+				CategoryID:  rows[i].OrgCategoryID.String(), // Convert UUID to string
+				PartyID:     rows[i].OrgPartyID.String(),    // Convert UUID to string
+				Mode:        rows[i].OrgMode,
+				ReceiptNo:   rows[i].OrgReceiptNo,
+				Description: rows[i].OrgDescription.String,
+			},
+			PartyName:    &rows[i].OrgPartyName, // Assuming SQL returns string or pointer
+			CategoryName: &rows[i].OrgCategoryName.String,
+		}
+
+		// C. Map Requested Changes (From JSON)
+		var tempReq tranReqType
+		if err := json.Unmarshal([]byte(rows[i].RequestedChanges), &tempReq); err != nil {
+			helpers.LogError("GetApprovalsHandler", "json unmarshal error", "err", err.Error())
+		}
+
+		response[i].RequestedChanges = transaction{
+			tranReqType:  tempReq,
+			PartyName:    &rows[i].ReqPartyName.String,    // From SQL Join
+			CategoryName: &rows[i].ReqCategoryName.String, // From SQL Join
+		}
 	}
-
-	res := rows
-	response := resType{Requests: res}
-
+	res := resType{Requests: response}
 	// 5. Success Response & Log
 	helpers.LogInfo("GetApprovalsHandler", "approvals listed successfully", "count", len(rows), "business_id", businessId)
-	helpers.RespondWithJSON(w, http.StatusOK, response)
+	helpers.RespondWithJSON(w, http.StatusOK, res)
 }

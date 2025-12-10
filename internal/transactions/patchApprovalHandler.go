@@ -3,6 +3,7 @@ package transactions
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"LedgerIt/internal/auth"
@@ -15,8 +16,31 @@ import (
 
 func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Parse Request
+	// type resType struct {
+	// 	Request db.PatchEditRequestRow `json:"request"`
+	// }
+	type transaction struct {
+		tranReqType
+		CategoryName *string `json:"category_name"`
+		PartyName    *string `json:"party_name"`
+	}
+	type dbResult struct {
+		ID               pgtype.UUID              `json:"id"`
+		TransactionID    pgtype.UUID              `json:"transaction_id"`
+		Type             db.TransactionChangeType `json:"type"`
+		Status           db.EditRequestStatus     `json:"status"`
+		Reason           pgtype.Text              `json:"reason"`
+		CreatedAt        pgtype.Timestamptz       `json:"created_at"`
+		UpdatedAt        pgtype.Timestamptz       `json:"updated_at"`
+		RequestedByID    pgtype.UUID              `json:"requested_by_id"`
+		RequestedByName  pgtype.Text              `json:"requested_by_name"`
+		ReviewedByID     pgtype.UUID              `json:"reviewed_by_id"`
+		ReviewedByName   pgtype.Text              `json:"reviewed_by_name"`
+		RequestedChanges transaction              `json:"requested_changes"`
+		Original         transaction              `json:"original"`
+	}
 	type resType struct {
-		Request db.PatchEditRequestRow `json:"request"`
+		Request dbResult `json:"request"`
 	}
 	type reqType struct {
 		tranReqType        // Embeds Amount, Mode, etc.
@@ -174,8 +198,52 @@ func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	request := dbResult{}
+	// A. Map Basic Fields
+	request.ID = updatedReq.ID
+	request.TransactionID = updatedReq.TransactionID
+	request.Type = updatedReq.Type
+	request.Status = updatedReq.Status
+	request.Reason = updatedReq.Reason
+	request.CreatedAt = updatedReq.CreatedAt
+	request.UpdatedAt = updatedReq.UpdatedAt
+	request.RequestedByID = updatedReq.RequestedByID
+	request.RequestedByName = updatedReq.RequestedByName
+	request.ReviewedByID = updatedReq.ReviewedByID
+	request.ReviewedByName = updatedReq.ReviewedByName
+
+	// B. Map Original Transaction (From SQL Columns)
+	// Convert Numeric Amount to String
+	orgAmountFloat, _ := updatedReq.OrgAmount.Float64Value()
+	orgAmountStr := fmt.Sprintf("%.2f", orgAmountFloat.Float64)
+
+	request.Original = transaction{
+		tranReqType: tranReqType{
+			Amount:      orgAmountStr,
+			Direction:   updatedReq.OrgDirection,
+			CategoryID:  updatedReq.OrgCategoryID.String(), // Convert UUID to string
+			PartyID:     updatedReq.OrgPartyID.String(),    // Convert UUID to string
+			Mode:        updatedReq.OrgMode,
+			ReceiptNo:   updatedReq.OrgReceiptNo,
+			Description: updatedReq.OrgDescription.String,
+		},
+		PartyName:    &updatedReq.OrgPartyName, // Assuming SQL returns string or pointer
+		CategoryName: &updatedReq.OrgCategoryName.String,
+	}
+
+	// C. Map Requested Changes (From JSON)
+	var tempReq tranReqType
+	if err := json.Unmarshal([]byte(updatedReq.RequestedChanges), &tempReq); err != nil {
+		helpers.LogError("GetApprovalsHandler", "json unmarshal error", "err", err.Error())
+	}
+
+	request.RequestedChanges = transaction{
+		tranReqType:  tempReq,
+		PartyName:    &updatedReq.ReqPartyName.String,    // From SQL Join
+		CategoryName: &updatedReq.ReqCategoryName.String, // From SQL Join
+	}
 	res := resType{
-		Request: updatedReq,
+		Request: request,
 	}
 	helpers.RespondWithJSON(w, http.StatusOK, res)
 	helpers.LogInfo("PatchApprovalHandler", "request updated", "id", approvalId, "status", targetStatus)
