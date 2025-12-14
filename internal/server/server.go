@@ -55,9 +55,15 @@ func (s *Server) setupRouter() {
 
 	// Apply CORS globally to all handlers
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:8000"},
+		AllowedOrigins: []string{
+			"http://localhost:3000",  // optional (web dev)
+			"http://localhost:8000",  // optional (web dev)
+			"http://localhost:19006", // Expo dev
+			"https://ledgerit-backend.onrender.com",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		ExposedHeaders:   []string{"Authorization"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -120,12 +126,10 @@ func (s *Server) SlogLoggerMiddleware(next http.Handler) http.Handler {
 			"method", r.Method,
 			"path", r.URL.Path,
 			"request_id", reqID, // ADDED: Tracing the request ID
+			"origin", r.Header.Get("Origin"),
 		)
 
 		// Pass the request to the next handler
 		next.ServeHTTP(w, r)
 	})
 }
-
-// DELETED: This function is now replaced by SlogLoggerMiddleware
-// func (s *Server) SimpleSlogLogger(next http.Handler) http.Handler { ... }
