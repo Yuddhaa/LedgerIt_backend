@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"time"
 
 	"LedgerIt/internal/db"
@@ -37,15 +38,32 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: [SECURITY] Remove this in production. Logging the raw IdToken is a security risk.
-	helpers.LogInfo("GoogleAuthHandler", "req.body:", body)
-
-	payload, err := idtoken.Validate(r.Context(), body.IdToken, h.googleClientId)
+	payload, err := idtoken.Validate(r.Context(), body.IdToken, "")
 	if err != nil {
 		// CHANGED: This is a client error (invalid token), not a server error.
 		helpers.RespondWithError(w, http.StatusUnauthorized, "invalid ID token")
 		// CHANGED: Use helper and log as Info (client-side error).
 		helpers.LogInfo("GoogleAuthHandler", "failed to validate id token", "error", err.Error())
+		return
+	}
+
+	// 3. MANUAL AUDIENCE CHECK [CRITICAL FIX]
+	// Define all the Client IDs your backend should trust.
+	// ideally, load these from your config/env variables
+	trustedClientIDs := []string{
+		h.googleClientId,  // Your existing Web ID
+		h.googleAndroidId, // Add your Android Client ID here
+		h.googleIOSId,     // Add your iOS Client ID here
+		// If you are using Expo Go, it might have a specific ID too
+	}
+
+	isValidAudience := slices.Contains(trustedClientIDs, payload.Audience)
+
+	if !isValidAudience {
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Token audience mismatch")
+		helpers.LogInfo("GoogleAuthHandler", "audience mismatch",
+			"token_aud", payload.Audience,
+			"expected_one_of", trustedClientIDs)
 		return
 	}
 

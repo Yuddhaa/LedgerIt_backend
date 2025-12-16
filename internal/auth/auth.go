@@ -36,20 +36,36 @@ const userClaimsKey contextKey = "userClaims"
 
 // Handler holds dependencies for auth-related HTTP handlers.
 type Handler struct {
-	logger         *slog.Logger
-	db             *db.Queries
-	pool           *pgxpool.Pool
-	googleClientId string
-	jwtSecret      string
+	logger          *slog.Logger
+	db              *db.Queries
+	pool            *pgxpool.Pool
+	googleClientId  string
+	googleAndroidId string
+	googleIOSId     string
+	jwtSecret       string
 }
 
 // NewHandler creates a new auth Handler, validating required environment variables.
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) (*Handler, error) {
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	googleClientID := os.Getenv("GOOGLE_WEB_CLIENT_ID")
 	if googleClientID == "" {
 		// This is a fatal startup error, log it as such.
-		helpers.LogError("auth.NewHandler", "GOOGLE_CLIENT_ID is not set in environment")
-		return nil, fmt.Errorf("GOOGLE_CLIENT_ID is not set")
+		helpers.LogError("auth.NewHandler", "GOOGLE_WEB_CLIENT_ID is not set in environment")
+		return nil, fmt.Errorf("GOOGLE_WEB_CLIENT_ID is not set")
+	}
+
+	googleAndroidId := os.Getenv("GOOGLE_ANDROID_ID")
+	if googleClientID == "" {
+		// This is a fatal startup error, log it as such.
+		helpers.LogError("auth.NewHandler", "GOOGLE_ANDROID_ID is not set in environment")
+		return nil, fmt.Errorf("GOOGLE_ANDROID_ID is not set")
+	}
+
+	googleIOSId := os.Getenv("GOOGLE_IOS_ID")
+	if googleClientID == "" {
+		// This is a fatal startup error, log it as such.
+		helpers.LogError("auth.NewHandler", "GOOGLE_IOS_ID is not set in environment")
+		return nil, fmt.Errorf("GOOGLE_IOS_ID is not set")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
@@ -59,11 +75,13 @@ func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) (*Handl
 		return nil, fmt.Errorf("JWT_SECRET is not set")
 	}
 	return &Handler{
-		logger:         logger,
-		db:             db,
-		pool:           pool,
-		googleClientId: googleClientID,
-		jwtSecret:      jwtSecret,
+		logger:          logger,
+		db:              db,
+		pool:            pool,
+		googleClientId:  googleClientID,
+		googleAndroidId: googleAndroidId,
+		googleIOSId:     googleIOSId,
+		jwtSecret:       jwtSecret,
 	}, nil
 }
 
