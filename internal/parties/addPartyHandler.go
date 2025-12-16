@@ -33,6 +33,12 @@ func (h *Handler) AddPartyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if body.Place == "" {
+		helpers.RespondWithError(w, http.StatusBadRequest, "Please provide place")
+		helpers.LogInfo("AddPartyHandler", "place is empty")
+		return
+	}
+
 	party, err := h.db.CreateParty(r.Context(), db.CreatePartyParams{
 		Name:       body.Name,
 		Place:      strings.ToLower(body.Place),
