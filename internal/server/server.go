@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"LedgerIt/internal/admin"
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/business"
 	"LedgerIt/internal/categories"
@@ -103,6 +104,9 @@ func (s *Server) setupRouter() {
 			helpers.LogInfo("setupRouter", "protected route test successful", "route", "/protectedTest")
 			w.Write([]byte("hello!! accessToken is still valid and Server is up and running"))
 		})
+
+		// ws route to log
+		r.Get("/admin/logs", admin.Hub.HandleLogs)
 
 		r.Mount("/api/v1/users/", userHandler.Routes())
 		r.Mount("/api/v1/business/", businessHandler.Routes())

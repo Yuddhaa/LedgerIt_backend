@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"LedgerIt/internal/admin"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/server"
@@ -107,7 +108,7 @@ func main() {
 		Addr:    fmt.Sprintf(":%v", cfg.port),
 		Handler: srvr.Router,
 	}
-
+	go admin.Hub.Run()
 	go func() {
 		logger.Info(" ------------------------------------------------ ")
 		helpers.LogInfo("main", "Starting server", "port", cfg.port)
