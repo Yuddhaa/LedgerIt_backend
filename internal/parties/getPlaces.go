@@ -18,7 +18,7 @@ func (h *Handler) GetPlacesHandler(w http.ResponseWriter, r *http.Request) {
 	places, err := h.db.ListUniquePartyPlacesByBusiness(r.Context(), businessId)
 	if err != nil {
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("GetPlacesHandler", "Db error in ListUniquePartyPlacesByBusiness", "err", err, "businessId", businessId)
+		helpers.LogError("GetPlacesHandler", "Db error in ListUniquePartyPlacesByBusiness", "err", err.Error(), "businessId", businessId)
 		return
 	}
 	res := resType{Places: places}

@@ -30,7 +30,7 @@ func (h *Handler) GetUserByPhone(w http.ResponseWriter, r *http.Request) {
 
 		// All other errors are actual server errors
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("GetUserByPhone", "Could not retrieve user by phone_no", "error", err, "phone_no", phone_no)
+		helpers.LogError("GetUserByPhone", "Could not retrieve user by phone_no", "error", err.Error(), "phone_no", phone_no)
 		return
 	}
 	res := resType{

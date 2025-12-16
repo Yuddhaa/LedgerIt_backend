@@ -18,7 +18,7 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	var body tranReqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
-		helpers.LogInfo("AddTransactionsHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("AddTransactionsHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 	type resType struct {
@@ -56,7 +56,7 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 		tempCategoryId, err := uuid.Parse(body.CategoryID)
 		if err != nil {
 			helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid category_id")
-			helpers.LogInfo("AddTransactionsHandler", "failed to convert category_id str to uuid", "error", err, "category_id", body.CategoryID)
+			helpers.LogInfo("AddTransactionsHandler", "failed to convert category_id str to uuid", "error", err.Error(), "category_id", body.CategoryID)
 			return
 		}
 		categoryID = pgtype.UUID{
@@ -69,7 +69,7 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	tempPartyId, err := uuid.Parse(body.PartyID)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid or no party_id")
-		helpers.LogInfo("AddTransactionsHandler", "failed to convert partyId str to uuid", "error", err, "party_id", body.PartyID)
+		helpers.LogInfo("AddTransactionsHandler", "failed to convert partyId str to uuid", "error", err.Error(), "party_id", body.PartyID)
 		return
 	}
 	partyId := pgtype.UUID{

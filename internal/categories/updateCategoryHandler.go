@@ -22,7 +22,7 @@ func (h *Handler) UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) 
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, 400, "Bad Request")
-		helpers.LogError("UpdateCategoryHandler", "bad request body", "err", err)
+		helpers.LogError("UpdateCategoryHandler", "bad request body", "err", err.Error())
 		return
 	}
 	BusinessID, ok := auth.ExtractUUID(w, r, "id")
@@ -52,7 +52,7 @@ func (h *Handler) UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("UpdateCategoryHandler", "Db error in UpdateCategory", "err", err, "body", body)
+		helpers.LogError("UpdateCategoryHandler", "Db error in UpdateCategory", "err", err.Error(), "body", body)
 		return
 	}
 	res := resType{Category: category}

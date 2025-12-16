@@ -31,7 +31,7 @@ func (h *Handler) DeleteCategoryHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("DeleteCategoryHandler", "Db error in DeleteCategory", "err", err, "categoryId", categoryId)
+		helpers.LogError("DeleteCategoryHandler", "Db error in DeleteCategory", "err", err.Error(), "categoryId", categoryId)
 		return
 	}
 	helpers.LogInfo("DeleteCategoryHandler", "204 response sent")

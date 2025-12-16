@@ -44,7 +44,7 @@ func logIndentedToConsole(level, calling, msg string, data ...any) {
 	prettyJSON, err := json.MarshalIndent(temp, "", "  ")
 	if err != nil {
 		// Fallback if marshaling fails
-		fmt.Printf("{\"level\":\"ERROR\", \"msg\":\"failed to marshal log\", \"error\":\"%v\"}\n", err)
+		fmt.Printf("{\"level\":\"ERROR\", \"msg\":\"failed to marshal log\", \"error\":\"%v\"}\n", err.Error())
 		return
 	}
 
@@ -78,7 +78,7 @@ func LogInfo(calling, msg string, data ...any) {
 func PrintJson(msg string, payload any) {
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-		fmt.Printf("\n%s\nError marshaling JSON: %v\n", msg, err)
+		fmt.Printf("\n%s\nError marshaling JSON: %v\n", msg, err.Error())
 		return
 	}
 

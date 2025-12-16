@@ -57,7 +57,7 @@ func (h *Handler) DeleteMemberHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.RespondWithError(w, http.StatusNotFound, "Target user is not a member of this business")
 			return
 		}
-		helpers.LogError("DeleteMemberHandler", "db error fetching member role", "err", err)
+		helpers.LogError("DeleteMemberHandler", "db error fetching member role", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -95,7 +95,7 @@ func (h *Handler) DeleteMemberHandler(w http.ResponseWriter, r *http.Request) {
 		BusinessID: businessId,
 		UserID:     targetUserID,
 	}); err != nil {
-		helpers.LogError("DeleteMemberHandler", "db error delete member", "err", err)
+		helpers.LogError("DeleteMemberHandler", "db error delete member", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}

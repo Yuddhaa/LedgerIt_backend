@@ -22,7 +22,7 @@ func (h *Handler) GetOwnedBusinessHandler(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		// CHANGED: Don't leak DB error. Use structured logging.
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("GetOwnedBusinessHandler", "db error in GetBusinessesByOwnerID", "error", err, "user_id", userId)
+		helpers.LogError("GetOwnedBusinessHandler", "db error in GetBusinessesByOwnerID", "error", err.Error(), "user_id", userId)
 		return
 	}
 

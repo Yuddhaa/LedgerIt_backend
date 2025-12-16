@@ -49,7 +49,7 @@ func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Json Request")
-		helpers.LogError("PatchApprovalHandler", "json decode error", "err", err)
+		helpers.LogError("PatchApprovalHandler", "json decode error", "err", err.Error())
 		return
 	}
 
@@ -130,7 +130,7 @@ func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Server Error")
 		// ADDED LOG
-		helpers.LogError("PatchApprovalHandler", "failed to begin tx", "err", err)
+		helpers.LogError("PatchApprovalHandler", "failed to begin tx", "err", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -152,7 +152,7 @@ func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.LogInfo("PatchApprovalHandler", "request not found or access denied", "approval_id", approvalId)
 			return
 		}
-		helpers.LogError("PatchApprovalHandler", "db update error", "err", err)
+		helpers.LogError("PatchApprovalHandler", "db update error", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}
@@ -194,7 +194,7 @@ func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Commit failed")
 		// ADDED LOG
-		helpers.LogError("PatchApprovalHandler", "commit failed", "err", err)
+		helpers.LogError("PatchApprovalHandler", "commit failed", "err", err.Error())
 		return
 	}
 

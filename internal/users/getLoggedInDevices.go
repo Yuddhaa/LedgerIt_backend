@@ -31,7 +31,7 @@ func (h *Handler) GetLoggedInDevices(w http.ResponseWriter, r *http.Request) {
 	// 1. Fetch from DB
 	tokens, err := h.db.ListUserDevices(r.Context(), userId)
 	if err != nil {
-		helpers.LogError("GetUserDevicesHandler", "db error fetching devices", "err", err)
+		helpers.LogError("GetUserDevicesHandler", "db error fetching devices", "err", err.Error())
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		return
 	}

@@ -33,7 +33,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: This is a client error, log as info.
-		helpers.LogInfo("GoogleAuthHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("GoogleAuthHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		// CHANGED: This is a client error (invalid token), not a server error.
 		helpers.RespondWithError(w, http.StatusUnauthorized, "invalid ID token")
 		// CHANGED: Use helper and log as Info (client-side error).
-		helpers.LogInfo("GoogleAuthHandler", "failed to validate id token", "error", err)
+		helpers.LogInfo("GoogleAuthHandler", "failed to validate id token", "error", err.Error())
 		return
 	}
 
@@ -75,7 +75,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging. This is a real server error.
-		helpers.LogError("GoogleAuthHandler", "err in generateSecureRandomString", "error", err)
+		helpers.LogError("GoogleAuthHandler", "err in generateSecureRandomString", "error", err.Error())
 		return
 	}
 	hashedRandStr := hashToken(refreshToken)
@@ -86,7 +86,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "Failed to begin transaction", "error", err)
+		helpers.LogError("GoogleAuthHandler", "Failed to begin transaction", "error", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context()) // Rollback on any error
@@ -109,7 +109,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "error in tx UpsertUserByEmail", "error", err)
+		helpers.LogError("GoogleAuthHandler", "error in tx UpsertUserByEmail", "error", err.Error())
 		return // Rollback is deferred
 	}
 
@@ -128,7 +128,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "err in tx InsertRefreshToken", "error", err)
+		helpers.LogError("GoogleAuthHandler", "err in tx InsertRefreshToken", "error", err.Error())
 		return // Rollback is deferred
 	}
 
@@ -136,7 +136,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "Failed to commit transaction", "error", err)
+		helpers.LogError("GoogleAuthHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
 
@@ -153,7 +153,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "error in signing the jwt token", "error", err)
+		helpers.LogError("GoogleAuthHandler", "error in signing the jwt token", "error", err.Error())
 		return
 	}
 

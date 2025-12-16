@@ -32,7 +32,7 @@ func (h *Handler) GetBusinessHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid business ID")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("GetBusinessHandler", "failed to parse business ID from URL", "error", err, "url_param", chi.URLParam(r, "id"))
+		helpers.LogInfo("GetBusinessHandler", "failed to parse business ID from URL", "error", err.Error(), "url_param", chi.URLParam(r, "id"))
 		return
 	}
 
@@ -55,7 +55,7 @@ func (h *Handler) GetBusinessHandler(w http.ResponseWriter, r *http.Request) {
 		// Any other error is a real 500
 		// CHANGED: Don't leak DB error. Use structured logging.
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("GetBusinessHandler", "db error in GetBusinessByID", "error", err, "user_id", userId, "business_id", businessId)
+		helpers.LogError("GetBusinessHandler", "db error in GetBusinessByID", "error", err.Error(), "user_id", userId, "business_id", businessId)
 		return
 	}
 

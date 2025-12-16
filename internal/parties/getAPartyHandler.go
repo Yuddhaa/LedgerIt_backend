@@ -34,7 +34,7 @@ func (h *Handler) GetAPartyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("GetAPartyHandler", "Db error in GetParty", "err", err, "party_id", partyId)
+		helpers.LogError("GetAPartyHandler", "Db error in GetParty", "err", err.Error(), "party_id", partyId)
 		return
 	}
 	res := resType{Party: party}

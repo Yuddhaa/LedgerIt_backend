@@ -23,7 +23,7 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: This is a client error, not a server error. Log as Info.
-		helpers.LogInfo("LogoutHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("LogoutHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *Handler) LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		// CHANGED: Don't leak the DB error to the client.
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper and structured logging. This is a real server error.
-		helpers.LogError("LogoutHandler", "error in DeleteRefreshTokenByHash", "error", err, "token_hash", hashedToken)
+		helpers.LogError("LogoutHandler", "error in DeleteRefreshTokenByHash", "error", err.Error(), "token_hash", hashedToken)
 		return
 	}
 

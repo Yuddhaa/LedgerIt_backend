@@ -98,7 +98,7 @@ func GenerateJwt(jwtClaims *Claims, jwtSecret string) (string, error) {
 	jwt, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		// This is a server-side error during the token signing process.
-		helpers.LogError("auth.GenerateJwt", "failed to sign JWT", "error", err)
+		helpers.LogError("auth.GenerateJwt", "failed to sign JWT", "error", err.Error())
 		return "", err
 	}
 	return jwt, nil
@@ -182,7 +182,7 @@ func GetUserIdFromContext(w http.ResponseWriter, r *http.Request) (pgtype.UUID, 
 	userUuid, err := uuid.Parse(userId)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("GetUserIdFromContext", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
+		helpers.LogError("GetUserIdFromContext", "error in converting userId to uuid", "error", err.Error(), "user_id_from_claim", userId)
 		return pgtype.UUID{}, false
 	}
 	return pgtype.UUID{
@@ -248,8 +248,8 @@ func generateSecureRandomString(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
 		// This is a rare, critical system-level error.
-		helpers.LogError("auth.generateSecureRandomString", "failed to read from crypto/rand", "error", err)
-		return "", fmt.Errorf("failed to read from crypto/rand: %w", err)
+		helpers.LogError("auth.generateSecureRandomString", "failed to read from crypto/rand", "error", err.Error())
+		return "", fmt.Errorf("failed to read from crypto/rand: %w", err.Error())
 	}
 
 	return hex.EncodeToString(b), nil

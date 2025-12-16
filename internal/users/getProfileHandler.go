@@ -31,7 +31,7 @@ func (h *Handler) GetProfileHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.RespondWithError(w, 404, "No user found")
 			return
 		}
-		helpers.LogError("GetProfileHandler", "error in GetUserById", "err", err, "userId:", userId)
+		helpers.LogError("GetProfileHandler", "error in GetUserById", "err", err.Error(), "userId:", userId)
 		helpers.RespondWithError(w, 500, "Server Error in getting user details")
 		return
 	}

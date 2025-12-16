@@ -35,7 +35,7 @@ func (h *Handler) GetPartyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		helpers.LogError("GetPartyHandler", "error in either ListPartiesByBusiness or ListPartiesByBusinessAndPlace",
-			"err", err, "businessId", businessId, "place", place)
+			"err", err.Error(), "businessId", businessId, "place", place)
 		helpers.RespondWithError(w, 500, "internal server error")
 		return
 	}

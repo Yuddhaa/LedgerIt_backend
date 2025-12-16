@@ -75,7 +75,7 @@ func (h *Handler) UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		helpers.LogError("UpdateMemberHandler", "db error fetching member role", "err", err)
+		helpers.LogError("UpdateMemberHandler", "db error fetching member role", "err", err.Error())
 		return
 	}
 
@@ -101,7 +101,7 @@ func (h *Handler) UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		helpers.LogError("UpdateMemberHandler", "db error updating member", "err", err)
+		helpers.LogError("UpdateMemberHandler", "db error updating member", "err", err.Error())
 		return
 	}
 

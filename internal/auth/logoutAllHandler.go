@@ -61,7 +61,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "err in generateSecureRandomString", "error", err)
+		helpers.LogError("LogoutAllHandler", "err in generateSecureRandomString", "error", err.Error())
 		return
 	}
 	hashedRandStr := hashToken(refreshToken)
@@ -73,7 +73,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error starting transaction")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "Failed to begin transaction", "error", err)
+		helpers.LogError("LogoutAllHandler", "Failed to begin transaction", "error", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -84,7 +84,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err := qtx.DeleteRefreshTokensByUserID(r.Context(), userId); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "error in tx DeleteRefreshTokensByUserID", "error", err, "user_id", userId)
+		helpers.LogError("LogoutAllHandler", "error in tx DeleteRefreshTokensByUserID", "error", err.Error(), "user_id", userId)
 		return // Rollback is deferred
 	}
 
@@ -103,7 +103,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "err in tx InsertRefreshToken", "error", err, "user_id", userId)
+		helpers.LogError("LogoutAllHandler", "err in tx InsertRefreshToken", "error", err.Error(), "user_id", userId)
 		return // Rollback is deferred
 	}
 
@@ -111,7 +111,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error committing transaction")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "Failed to commit transaction", "error", err)
+		helpers.LogError("LogoutAllHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
 
@@ -128,7 +128,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "error in signing the jwt token", "error", err)
+		helpers.LogError("LogoutAllHandler", "error in signing the jwt token", "error", err.Error())
 		return
 	}
 

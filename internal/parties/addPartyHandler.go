@@ -24,7 +24,7 @@ func (h *Handler) AddPartyHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad request")
-		helpers.LogError("AddPartyHandler", "json decode error", "err", err)
+		helpers.LogError("AddPartyHandler", "json decode error", "err", err.Error())
 		return
 	}
 	helpers.LogInfo("AddPartyHandler", "req got", "req body", body)
@@ -50,7 +50,7 @@ func (h *Handler) AddPartyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("AddPartyHandler", "error in db CreateParty", "err", err)
+		helpers.LogError("AddPartyHandler", "error in db CreateParty", "err", err.Error())
 		return
 	}
 	res := resType{Party: party}
