@@ -99,6 +99,28 @@ func main() {
 	// If using Direct (port 5432), keep this lower (e.g., 10).
 	dbConfig.MaxConns = 10
 
+	// This runs every time a connection is borrowed.
+	dbConfig.PrepareConn = func(ctx context.Context, conn *pgx.Conn) (bool, error) {
+		// 1. Create a short timeout context (e.g., 1 second).
+		//    If the connection is a "zombie" (serverless freeze), the Ping
+		//    would normally hang for 2 mins. This context forces it to fail FAST.
+		checkCtx, cancel := context.WithTimeout(ctx, 1*time.Second)
+		defer cancel()
+
+		// 2. Ping the database
+		if err := conn.Ping(checkCtx); err != nil {
+			// 3. THE MAGIC: Return false, nil
+			//    - false: "This connection is bad, destroy it."
+			//    - nil:   "Don't error out the user's request. Just retry on a new connection."
+			//    This fixes the freeze seamlessly.
+			helpers.LogInfo("main.go> prepareconn", "returning false and nil")
+			return false, nil
+		}
+
+		// Connection is alive and healthy!
+		helpers.LogInfo("main.go> prepareconn", "returning true and nil")
+		return true, nil
+	}
 	// 3. Create the Pool
 	pool, err := pgxpool.NewWithConfig(dbCtx, dbConfig)
 	if err != nil {
