@@ -66,6 +66,6 @@ func (h *Handler) GetBusinessMembers(w http.ResponseWriter, r *http.Request) {
 	res := resType{
 		Members: members,
 	}
-	helpers.LogInfo("GetBusinessMembers", "response sent", "Members", members)
+	helpers.LogInfo("GetBusinessMembers", "response sent", "Members count", len(members))
 	helpers.RespondWithJSON(w, 200, res)
 }
