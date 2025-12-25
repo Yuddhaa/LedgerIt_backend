@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -120,6 +121,14 @@ func main() {
 		// Connection is alive and healthy!
 		helpers.LogInfo("main.go> prepareconn", "returning true and nil")
 		return true, nil
+	}
+
+	dbConfig.ConnConfig.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		d := &net.Dialer{
+			Timeout:   3 * time.Second, // <--- THE KEY FIX
+			KeepAlive: 30 * time.Second,
+		}
+		return d.DialContext(ctx, network, addr)
 	}
 	// 3. Create the Pool
 	pool, err := pgxpool.NewWithConfig(dbCtx, dbConfig)
