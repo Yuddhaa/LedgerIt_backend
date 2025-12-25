@@ -1,9 +1,11 @@
 package server
 
 import (
+	"context"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"LedgerIt/internal/admin"
 	"LedgerIt/internal/auth"
@@ -89,8 +91,20 @@ func (s *Server) setupRouter() {
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		helpers.LogInfo("setupRouter", "server is up and running", "route", "/")
-		w.Write([]byte("hello!! Server is up and running"))
+		// helpers.LogInfo("setupRouter", "server is up and running", "route", "/")
+		// w.Write([]byte("hello!! Server is up and running"))
+
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+
+		if err := s.pool.Ping(ctx); err != nil {
+			helpers.LogError("health", "db ping failed", "error", err.Error())
+			http.Error(w, "db unhealthy", 500)
+			return
+		}
+
+		w.WriteHeader(200)
+		w.Write([]byte("hello!! Server and db is up and running"))
 	})
 
 	r.Mount("/api/v1/auth/", authHandler.Routes())

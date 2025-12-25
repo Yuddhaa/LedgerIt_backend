@@ -50,6 +50,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ---------------------------------------------------------------------------------------------------
 	// 1. GET: Find the token. This can happen *before* the transaction.
+	helpers.LogInfo("RefreshHandler", "before GetRefreshTokenByHash")
 	row, err := h.db.GetRefreshTokenByHash(r.Context(), hashedToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -65,6 +66,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
+	helpers.LogInfo("RefreshHandler", "after GetRefreshTokenByHash")
 
 	// ---------------------------------------------------------------------------------------------------
 	// 2. GENERATE: Create new tokens *before* starting the DB transaction.
