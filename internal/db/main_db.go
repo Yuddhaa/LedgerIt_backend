@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"LedgerIt/internal/helpers"
-
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -45,7 +43,6 @@ type FilterParams struct {
 // buildWhereClause Helper: Builds the WHERE clause and Arguments
 // Returns: (WHERE string, args []any)
 func (db *DBStore) buildWhereClause(arg FilterParams) (string, []any) {
-	helpers.LogInfo("db GetTransactionsHandler", "1")
 	query := "From transactions WHERE business_id = $1"
 	queryArgs := []any{arg.BusinessID}
 	count := 2
@@ -148,12 +145,10 @@ func (db *DBStore) GetFilteredTransactions(ctx context.Context, arg FilterParams
 	}
 
 	query += orderByClause
-	helpers.LogInfo("db GetFilteredTransactions", "final_query", "query", query, "args", queryArgs)
 
 	// 4. Execute
 	rows, err := db.Pool.Query(ctx, query, queryArgs...)
 	if err != nil {
-		helpers.LogError("db GetFilteredTransactions", "error in sending the query itself", "err", err.Error())
 		return nil, err
 	}
 	defer rows.Close()

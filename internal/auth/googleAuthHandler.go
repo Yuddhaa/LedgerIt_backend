@@ -69,17 +69,13 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	googleId, ok := payload.Claims["sub"].(string)
 	if !ok || googleId == "" {
-		// CHANGED: This is a client error (malformed token), not a server error.
 		helpers.RespondWithError(w, http.StatusBadRequest, "invalid token: missing googleId (sub) claim")
-		// CHANGED: Use helper, log as Info (client-side error).
 		helpers.LogInfo("GoogleAuthHandler", "invalid token: missing googleId (sub) claim")
 		return
 	}
 	email, ok := payload.Claims["email"].(string)
 	if !ok || email == "" {
-		// CHANGED: This is a client error (malformed token), not a server error.
 		helpers.RespondWithError(w, http.StatusBadRequest, "invalid token: missing email claim")
-		// CHANGED: Use helper, log as Info (client-side error).
 		helpers.LogInfo("GoogleAuthHandler", "invalid token: missing email claim")
 		return
 	}
@@ -126,7 +122,6 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
 		helpers.LogError("GoogleAuthHandler", "error in tx UpsertUserByEmail", "error", err.Error())
 		return // Rollback is deferred
 	}
@@ -145,7 +140,6 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
 		helpers.LogError("GoogleAuthHandler", "err in tx InsertRefreshToken", "error", err.Error())
 		return // Rollback is deferred
 	}
@@ -153,7 +147,6 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// 3c. Commit the transaction
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
 		helpers.LogError("GoogleAuthHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
@@ -170,15 +163,13 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}, h.jwtSecret)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
 		helpers.LogError("GoogleAuthHandler", "error in signing the jwt token", "error", err.Error())
 		return
 	}
 
 	// ---------------------------------------------------------------------------------------------------
 	// 5. Send Response
-	// TODO: [SECURITY] Remove this in production. Logging raw AccessTokens and RefreshTokens is a security risk.
-	helpers.LogInfo("GoogleAuthHandler", "response", resType{User: user, AccessToken: accessToken, RefreshToken: refreshToken})
+	helpers.LogInfo("GoogleAuthHandler", "response", "user_id", user.ID.Bytes, "username", user.Name.String)
 
 	helpers.RespondWithJSON(w, 201, resType{
 		User:         user,

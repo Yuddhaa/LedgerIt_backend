@@ -40,12 +40,9 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: This is a client error, log as Info.
-		helpers.LogInfo("RefreshHandler", "failed to decode request body", "error", err.Error())
+		helpers.LogError("RefreshHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
-
-	// TODO: [SECURITY] Remove this in production. Logging the raw RefreshToken is a security risk.
-	helpers.LogInfo("RefreshHandler", "body decoded", "body", body)
 
 	// ---------------------------------------------------------------------------------------------------
 	// Hash the incoming token
@@ -150,7 +147,6 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  accessToken,
 	}
 
-	// TODO: [SECURITY] Remove this in production. Logging the new raw RefreshToken is a security risk.
-	helpers.LogInfo("RefreshHandler", "token refresh successful", "response", res)
+	helpers.LogInfo("RefreshHandler", "token refresh successful")
 	helpers.RespondWithJSON(w, 200, res)
 }

@@ -112,7 +112,7 @@ func parseDate(w http.ResponseWriter, paramName, dateStr string) (time.Time, boo
 	parsedTime, err := time.Parse(layout, dateStr)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Invalid date format for "+paramName+". Use YYYY-MM-DD")
-		helpers.LogError("parseDate", "date parse error", "err", err.Error())
+		helpers.LogError("parseDate", "date parse error", "input date string", dateStr, "err", err.Error())
 		return time.Time{}, false
 	}
 	helpers.PrintJson("parsedTime", parsedTime)

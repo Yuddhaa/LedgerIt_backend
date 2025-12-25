@@ -49,28 +49,24 @@ type Handler struct {
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) (*Handler, error) {
 	googleClientID := os.Getenv("GOOGLE_WEB_CLIENT_ID")
 	if googleClientID == "" {
-		// This is a fatal startup error, log it as such.
 		helpers.LogError("auth.NewHandler", "GOOGLE_WEB_CLIENT_ID is not set in environment")
 		return nil, fmt.Errorf("GOOGLE_WEB_CLIENT_ID is not set")
 	}
 
 	googleAndroidId := os.Getenv("GOOGLE_ANDROID_ID")
 	if googleClientID == "" {
-		// This is a fatal startup error, log it as such.
 		helpers.LogError("auth.NewHandler", "GOOGLE_ANDROID_ID is not set in environment")
 		return nil, fmt.Errorf("GOOGLE_ANDROID_ID is not set")
 	}
 
 	googleIOSId := os.Getenv("GOOGLE_IOS_ID")
 	if googleClientID == "" {
-		// This is a fatal startup error, log it as such.
 		helpers.LogError("auth.NewHandler", "GOOGLE_IOS_ID is not set in environment")
 		return nil, fmt.Errorf("GOOGLE_IOS_ID is not set")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		// This is also a fatal startup error.
 		helpers.LogError("auth.NewHandler", "JWT_SECRET is not set in environment")
 		return nil, fmt.Errorf("JWT_SECRET is not set")
 	}

@@ -37,7 +37,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("AddMemberHandler", "failed to decode request body", "error", err.Error())
+		helpers.LogError("AddMemberHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 
@@ -52,7 +52,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid business ID")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("AddMemberHandler", "failed to parse business ID from URL", "error", err.Error(), "url_param", chi.URLParam(r, "id"))
+		helpers.LogError("AddMemberHandler", "failed to parse business ID from URL", "error", err.Error(), "url_param", chi.URLParam(r, "id"))
 		return
 	}
 	businessUuid := pgtype.UUID{
@@ -67,7 +67,7 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid user_id format")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("AddMemberHandler", "failed to parse new user ID from body", "error", err.Error(), "user_id_body", body.UserId)
+		helpers.LogError("AddMemberHandler", "failed to parse new user ID from body", "error", err.Error(), "user_id_body", body.UserId)
 		return
 	}
 	member, err := h.db.AddBusinessMember(r.Context(), db.AddBusinessMemberParams{
@@ -91,7 +91,6 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ADDED: Log successful add
 	helpers.LogInfo("AddMemberHandler", "member added successfully", "new_user_id", newUserId, "business_id", businessId, "added_by", requestorUuid)
 	helpers.RespondWithJSON(w, 201, resType{
 		Member: member,

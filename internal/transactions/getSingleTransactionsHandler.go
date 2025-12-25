@@ -41,7 +41,7 @@ func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Re
 
 		// All other errors are actual server errors
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogInfo("GetSingleTransactionsHandler", "db error in GetSingleTransaction", "transactionId", transactionId, "businessId", businessId)
+		helpers.LogError("GetSingleTransactionsHandler", "db error in GetSingleTransaction", "transactionId", transactionId, "businessId", businessId)
 		return
 	}
 	userId, ok := auth.GetUserIdFromContext(w, r)

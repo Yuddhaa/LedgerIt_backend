@@ -60,7 +60,7 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("UpdatePartyHandler", "Db error in UpdateParty", "err", err.Error(), "body", body)
+		helpers.LogError("UpdatePartyHandler", "Db error in UpdateParty", "err", err.Error(), "party_id", partyId)
 		return
 	}
 	res := resType{Party: party}

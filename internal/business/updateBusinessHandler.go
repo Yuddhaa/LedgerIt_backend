@@ -67,7 +67,7 @@ func (h *Handler) UpdateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogInfo("UpdateBusinessHandler", "Db error in UpdateBusiness", "businessId", businessId, "err", err.Error())
+		helpers.LogError("UpdateBusinessHandler", "Db error in UpdateBusiness", "businessId", businessId, "err", err.Error())
 		return
 	}
 	// ****************************************************************************************************************

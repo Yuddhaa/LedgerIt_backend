@@ -73,7 +73,6 @@ func (h *Handler) UpdateUserProfileHandler(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		// CHANGED: This is a 500 error. Use LogError and don't leak details.
 		helpers.LogError("UpdateUserProfileHandler", "error in sql UpdateUserProfile", "error", err.Error(), "user_id", userId)
 		return
 	}
