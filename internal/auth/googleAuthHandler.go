@@ -154,7 +154,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		UserId: h.uuidToString(user.ID),
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    "LedgerIt",
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(3 * 365 * 24 * time.Hour)),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}, h.jwtSecret)
@@ -167,11 +167,6 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// ---------------------------------------------------------------------------------------------------
 	// 5. Send Response
 	helpers.LogInfo("GoogleAuthHandler", "response", "user_id", user.ID, "username", user.Name.String)
-	helpers.LogInfo("GoogleAuthHandler", "resonse", "res", resType{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken, // <-- Send the raw, unhashed token
-	})
-
 	helpers.RespondWithJSON(w, 201, resType{
 		User:         user,
 		AccessToken:  accessToken,
