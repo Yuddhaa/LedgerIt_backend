@@ -29,7 +29,6 @@ func (h *Handler) UpdateTransactionHandler(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	helpers.PrintJson("role", role)
 
 	tranId, ok := auth.ExtractUUID(w, r, "tran_id")
 	if !ok {
@@ -45,7 +44,6 @@ func (h *Handler) UpdateTransactionHandler(w http.ResponseWriter, r *http.Reques
 	if !ok {
 		return
 	}
-	helpers.PrintJson("userID", userId)
 
 	// 3. START TRANSACTION (Parent Level)
 	tx, err := h.db.Pool.Begin(r.Context())
@@ -196,7 +194,6 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Update failed")
 		return
 	}
-	helpers.PrintJson("updatedTran", updatedTran)
 
 	// 4. Calculate Balance Adjustment (Reverse Old, Apply New)
 	oldVal, _ := oldTran.Amount.Float64Value()
@@ -205,25 +202,24 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 	var balanceDelta float64 = 0
 
 	// A. Reverse Old Impact
-	if oldTran.Mode == "cash" {
-		if oldTran.Direction == "in" {
-			balanceDelta -= oldVal.Float64
-		} else {
-			balanceDelta += oldVal.Float64
-		}
+	// if oldTran.Mode == "cash" {
+	if oldTran.Direction == "in" {
+		balanceDelta -= oldVal.Float64
+	} else {
+		balanceDelta += oldVal.Float64
 	}
+	// }
 
 	// B. Apply New Impact
-	if body.Mode == "cash" {
-		if body.Direction == "in" {
-			balanceDelta += newVal.Float64
-		} else {
-			balanceDelta -= newVal.Float64
-		}
+	// if body.Mode == "cash" {
+	if body.Direction == "in" {
+		balanceDelta += newVal.Float64
+	} else {
+		balanceDelta -= newVal.Float64
 	}
+	// }
 
 	// 5. Update Balance (If needed)
-	helpers.PrintJson("balanceDelta", balanceDelta)
 	if balanceDelta != 0 {
 		var deltaNumeric pgtype.Numeric
 		if err := deltaNumeric.Scan(fmt.Sprintf("%.2f", balanceDelta)); err != nil {
@@ -232,9 +228,7 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 			return
 		}
 
-		helpers.PrintJson("deltaNumeric", deltaNumeric)
 		// Note: We update the balance of the ORIGINAL creator (oldTran.UserID)
-		helpers.PrintJson("", "updating UpdateBusinessMemberBalance")
 		err = qtx.UpdateBusinessMemberBalance(r.Context(), db.UpdateBusinessMemberBalanceParams{
 			CurrentBalance: deltaNumeric, // Using Amount based on SQL logic (+ $1)
 			UserID:         oldTran.UserID,
@@ -245,7 +239,6 @@ func (h *Handler) processAdminUpdate(r *http.Request, w http.ResponseWriter, tx 
 			helpers.RespondWithError(w, http.StatusInternalServerError, "Balance update failed")
 			return
 		}
-		helpers.PrintJson("", "updating UpdateBusinessMemberBalance done")
 	}
 
 	// 6. COMMIT (Must happen before response)

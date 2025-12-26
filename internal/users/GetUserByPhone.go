@@ -36,6 +36,6 @@ func (h *Handler) GetUserByPhone(w http.ResponseWriter, r *http.Request) {
 	res := resType{
 		User: user,
 	}
-	helpers.LogInfo("GetUserByPhone", "response sent", "response", res)
+	helpers.LogInfo("GetUserByPhone", "user data sent", "userId", user.ID)
 	helpers.RespondWithJSON(w, 200, res)
 }

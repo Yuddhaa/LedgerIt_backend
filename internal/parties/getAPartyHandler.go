@@ -38,6 +38,6 @@ func (h *Handler) GetAPartyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Party: party}
-	helpers.LogInfo("GetAPartyHandler", "response sent", "response", res)
+	helpers.LogInfo("GetAPartyHandler", "party sent", "partyId", partyId)
 	helpers.RespondWithJSON(w, 200, res)
 }

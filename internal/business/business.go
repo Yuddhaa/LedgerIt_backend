@@ -88,11 +88,12 @@ func (h *Handler) GetRole(next http.Handler) http.Handler {
 			roleInt = -1
 			return
 		}
-		if role == db.BusinessRoleEmployee {
+		switch role {
+		case db.BusinessRoleEmployee:
 			roleInt = 2 // employee
-		} else if role == db.BusinessRoleAdmin {
+		case db.BusinessRoleAdmin:
 			roleInt = 3 // admin
-		} else {
+		default:
 			roleInt = 1 // creator
 		}
 

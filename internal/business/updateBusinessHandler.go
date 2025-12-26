@@ -75,5 +75,5 @@ func (h *Handler) UpdateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 	// ****************************************************************************************************************
 	res := resType{Business: business}
 	helpers.RespondWithJSON(w, 200, res)
-	helpers.LogInfo("UpdateBusinessHandler", "response sent", "res", res)
+	helpers.LogInfo("UpdateBusinessHandler", "response sent", "businessId", businessId)
 }

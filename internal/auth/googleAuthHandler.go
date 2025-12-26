@@ -33,16 +33,13 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
-		// CHANGED: This is a client error, log as info.
 		helpers.LogInfo("GoogleAuthHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 
 	payload, err := idtoken.Validate(r.Context(), body.IdToken, "")
 	if err != nil {
-		// CHANGED: This is a client error (invalid token), not a server error.
 		helpers.RespondWithError(w, http.StatusUnauthorized, "invalid ID token")
-		// CHANGED: Use helper and log as Info (client-side error).
 		helpers.LogInfo("GoogleAuthHandler", "failed to validate id token", "error", err.Error())
 		return
 	}
@@ -169,7 +166,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ---------------------------------------------------------------------------------------------------
 	// 5. Send Response
-	helpers.LogInfo("GoogleAuthHandler", "response", "user_id", user.ID.Bytes, "username", user.Name.String)
+	helpers.LogInfo("GoogleAuthHandler", "response", "user_id", user.ID, "username", user.Name.String)
 
 	helpers.RespondWithJSON(w, 201, resType{
 		User:         user,

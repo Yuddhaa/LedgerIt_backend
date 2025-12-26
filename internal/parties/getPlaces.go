@@ -22,6 +22,6 @@ func (h *Handler) GetPlacesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Places: places}
-	helpers.LogInfo("GetPlacesHandler", "response sent", "response", res)
+	helpers.LogInfo("GetPlacesHandler", "all the unique places of parties sent", "businessId", businessId, "places count", len(places))
 	helpers.RespondWithJSON(w, 200, res)
 }

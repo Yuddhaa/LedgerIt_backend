@@ -56,6 +56,6 @@ func (h *Handler) UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	res := resType{Category: category}
-	helpers.LogInfo("UpdateCategoryHandler", "response sent", "res", res)
+	helpers.LogInfo("UpdateCategoryHandler", "category updated", "categoryId", categoryId)
 	helpers.RespondWithJSON(w, 200, res)
 }

@@ -154,6 +154,6 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	res := resType{Transaction: transaction}
-	helpers.LogInfo("AddTransactionsHandler", "response sent", "response", res)
+	helpers.LogInfo("AddTransactionsHandler", "transaction added", "transactionId", transaction.ID)
 	helpers.RespondWithJSON(w, 201, res)
 }

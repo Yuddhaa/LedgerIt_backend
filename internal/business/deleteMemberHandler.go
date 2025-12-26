@@ -53,7 +53,7 @@ func (h *Handler) DeleteMemberHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			helpers.LogInfo("DeleteMemberHandler", "target user not found in business", "target_id", targetUserID.Bytes)
+			helpers.LogInfo("DeleteMemberHandler", "target user not found in business", "target_id", targetUserID)
 			helpers.RespondWithError(w, http.StatusNotFound, "Target user is not a member of this business")
 			return
 		}
@@ -101,6 +101,6 @@ func (h *Handler) DeleteMemberHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 8. Success
-	helpers.LogInfo("DeleteMemberHandler", "member deleted successfully", "target_user_id", targetUserID.Bytes)
+	helpers.LogInfo("DeleteMemberHandler", "member deleted successfully", "target_user_id", targetUserID)
 	w.WriteHeader(http.StatusNoContent)
 }

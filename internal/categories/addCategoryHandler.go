@@ -43,6 +43,6 @@ func (h *Handler) AddCategoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Category: category}
-	helpers.LogInfo("AddCategoryHandler", "response sent", "response", res)
+	helpers.LogInfo("AddCategoryHandler", "response sent", "categoryId", category.ID)
 	helpers.RespondWithJSON(w, 201, res)
 }

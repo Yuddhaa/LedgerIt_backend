@@ -44,17 +44,9 @@ func (h *Handler) UpdateUserProfileHandler(w http.ResponseWriter, r *http.Reques
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
-		// CHANGED: This is a client error. Log as Info.
 		helpers.LogInfo("UpdateUserProfileHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
-
-	// 3. Log the processing event
-	helpers.LogInfo("UpdateUserProfileHandler", "processing user profile update",
-		"user_id", userId,
-		"name", body.Name,
-		"phone", body.PhoneNumber,
-	)
 
 	// 4. Perform database update
 	user, err := h.db.UpdateUserProfile(r.Context(), db.UpdateUserProfileParams{

@@ -38,6 +38,6 @@ func (h *Handler) GetACategoryHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Category: category}
-	helpers.LogInfo("GetACategoryHandler", "response sent", "response", res)
+	helpers.LogInfo("GetACategoryHandler", "response sent", "categoryId", categoryId)
 	helpers.RespondWithJSON(w, 200, res)
 }

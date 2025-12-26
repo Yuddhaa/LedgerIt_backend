@@ -64,6 +64,6 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Party: party}
-	helpers.LogInfo("UpdatePartyHandler", "response sent", "res", res)
+	helpers.LogInfo("UpdatePartyHandler", "party updated", "partyId", partyId)
 	helpers.RespondWithJSON(w, 200, res)
 }

@@ -27,7 +27,6 @@ func (h *Handler) AddPartyHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogError("AddPartyHandler", "json decode error", "err", err.Error())
 		return
 	}
-	helpers.LogInfo("AddPartyHandler", "req got", "req body", body)
 	businessId, ok := auth.ExtractUUID(w, r, "id")
 	if !ok {
 		return
@@ -60,6 +59,6 @@ func (h *Handler) AddPartyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Party: party}
-	helpers.LogInfo("AddPartyHandler", "response sent", "response", res)
+	helpers.LogInfo("AddPartyHandler", "party added", "partyId", party.ID)
 	helpers.RespondWithJSON(w, 201, res)
 }

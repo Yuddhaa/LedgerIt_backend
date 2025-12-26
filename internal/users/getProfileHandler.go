@@ -36,6 +36,6 @@ func (h *Handler) GetProfileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{User: user}
-	helpers.LogInfo("GetProfileHandler", "response sent", "response", res)
+	helpers.LogInfo("GetProfileHandler", "user profile sent", "userid", userId)
 	helpers.RespondWithJSON(w, 200, res)
 }

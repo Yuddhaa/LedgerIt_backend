@@ -24,7 +24,6 @@ func (h *Handler) GetAllCategoriesHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 	res := resType{Categories: categories}
-	helpers.LogInfo("GetAllCategoriesHandler", "response sent", "res", res, "count", len(res.Categories),
-		"businessId", businessId)
+	helpers.LogInfo("GetAllCategoriesHandler", "categories sent", "count", len(res.Categories), "businessId", businessId)
 	helpers.RespondWithJSON(w, 200, res)
 }

@@ -91,18 +91,6 @@ func (s *Server) setupRouter() {
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		helpers.LogInfo("setupRouter", "server is up and running", "route", "/")
 		w.Write([]byte("hello!! Server is up and running"))
-
-		// ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-		// defer cancel()
-		//
-		// if err := s.pool.Ping(ctx); err != nil {
-		// 	helpers.LogError("health", "db ping failed", "error", err.Error())
-		// 	http.Error(w, "db unhealthy", 500)
-		// 	return
-		// }
-		//
-		// w.WriteHeader(200)
-		// w.Write([]byte("hello!! Server and db is up and running"))
 	})
 
 	r.Mount("/api/v1/auth/", authHandler.Routes())
@@ -137,7 +125,6 @@ func (s *Server) SlogLoggerMiddleware(next http.Handler) http.Handler {
 		// Get the RequestID from the context (set by middleware.RequestID)
 		reqID := middleware.GetReqID(r.Context())
 
-		// CHANGED: Use helpers.LogInfo to get both file and console logging.
 		helpers.LogInfo("SlogLoggerMiddleware", "incoming request",
 			"method", r.Method,
 			"path", r.URL.Path,

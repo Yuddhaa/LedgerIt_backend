@@ -74,7 +74,7 @@ func (h *Handler) GetLoggedInDevices(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helpers.LogInfo("GetUserDevicesHandler", "devices listed", "user_id", userId, "count", len(devices))
-	helpers.RespondWithJSON(w, http.StatusOK, map[string]interface{}{
+	helpers.RespondWithJSON(w, http.StatusOK, map[string]any{
 		"devices": devices,
 	})
 }

@@ -70,5 +70,5 @@ func (h *Handler) GetSingleTransactionsHandler(w http.ResponseWriter, r *http.Re
 	// **********************************************
 	res := resType{Transaction: transaction[0]}
 	helpers.RespondWithJSON(w, 200, res)
-	helpers.LogInfo("GetSingleTransaction", "success", "res", res)
+	helpers.LogInfo("GetSingleTransaction", "transaction sent", "transactionId", transactionId)
 }
