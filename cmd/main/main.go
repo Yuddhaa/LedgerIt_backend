@@ -128,6 +128,7 @@ func main() {
 			Timeout:   3 * time.Second, // <--- THE KEY FIX
 			KeepAlive: 30 * time.Second,
 		}
+		helpers.LogInfo("main", "dialfunc was called")
 		return d.DialContext(ctx, network, addr)
 	}
 	// 3. Create the Pool
