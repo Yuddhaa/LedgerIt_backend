@@ -125,7 +125,7 @@ func main() {
 
 	dbConfig.ConnConfig.DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error) {
 		d := &net.Dialer{
-			Timeout:   3 * time.Second, // <--- THE KEY FIX
+			Timeout:   10 * time.Second, // <--- THE KEY FIX
 			KeepAlive: 30 * time.Second,
 		}
 		helpers.LogInfo("main", "dialfunc was called")
