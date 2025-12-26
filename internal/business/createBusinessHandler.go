@@ -37,7 +37,11 @@ func (h *Handler) CreateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 		PName:    body.Name,
 	})
 	if err != nil {
-		// CHANGED: Don't leak DB error. Use structured logging.
+		if helpers.IsUniqueViolation(err) {
+			helpers.RespondWithError(w, http.StatusConflict, "Business already exists")
+			helpers.LogInfo("CreateBusinessHandler", "Business already exists")
+			return
+		}
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		helpers.LogError("CreateBusinessHandler", "db error in CreateBusinessAndAddOwner", "error", err.Error())
 		return

@@ -61,6 +61,11 @@ func (h *Handler) UpdateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 		Name: body.Name,
 	})
 	if err != nil {
+		if helpers.IsUniqueViolation(err) {
+			helpers.RespondWithError(w, http.StatusConflict, "Business already exists")
+			helpers.LogInfo("UpdateBusinessHandler", "Business already exists")
+			return
+		}
 		if errors.Is(err, pgx.ErrNoRows) {
 			helpers.RespondWithError(w, http.StatusNotFound, "Business not found")
 			helpers.LogInfo("UpdateBusinessHandler", "Business not found in UpdateBusiness", "businessId", businessId)

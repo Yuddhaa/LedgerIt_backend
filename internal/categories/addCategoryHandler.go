@@ -34,7 +34,6 @@ func (h *Handler) AddCategoryHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if helpers.IsUniqueViolation(err) {
 			helpers.RespondWithError(w, http.StatusConflict, "category already exists")
-			// ADDED: Log the conflict
 			helpers.LogInfo("AddCategoryHandler", "conflict: category already exists", "party name", body.Name, "business_id", businessId)
 			return
 		}

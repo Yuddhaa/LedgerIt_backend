@@ -34,7 +34,9 @@ CREATE TABLE businesses (
     name TEXT NOT NULL,
     owner_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+
+    CONSTRAINT unique_business_name_per_owner UNIQUE (name, owner_id)
 );
 CREATE INDEX idx_businesses_owner_id ON businesses(owner_id);
 
