@@ -3,6 +3,7 @@ package auth
 import (
 	"encoding/json"
 	"net/http"
+	"slices"
 	"time"
 
 	"LedgerIt/internal/db"
@@ -32,36 +33,46 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
-		// CHANGED: This is a client error, log as info.
-		helpers.LogInfo("GoogleAuthHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("GoogleAuthHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 
-	// TODO: [SECURITY] Remove this in production. Logging the raw IdToken is a security risk.
-	helpers.LogInfo("GoogleAuthHandler", "req.body:", body)
-
-	payload, err := idtoken.Validate(r.Context(), body.IdToken, h.googleClientId)
+	payload, err := idtoken.Validate(r.Context(), body.IdToken, "")
 	if err != nil {
-		// CHANGED: This is a client error (invalid token), not a server error.
 		helpers.RespondWithError(w, http.StatusUnauthorized, "invalid ID token")
-		// CHANGED: Use helper and log as Info (client-side error).
-		helpers.LogInfo("GoogleAuthHandler", "failed to validate id token", "error", err)
+		helpers.LogInfo("GoogleAuthHandler", "failed to validate id token", "error", err.Error())
+		return
+	}
+
+	// 3. MANUAL AUDIENCE CHECK [CRITICAL FIX]
+	// Define all the Client IDs your backend should trust.
+	// ideally, load these from your config/env variables
+	trustedClientIDs := []string{
+		h.googleClientId,  // Your existing Web ID
+		h.googleAndroidId, // Add your Android Client ID here
+		h.googleIOSId,     // Add your iOS Client ID here
+		// If you are using Expo Go, it might have a specific ID too
+	}
+
+	isValidAudience := slices.Contains(trustedClientIDs, payload.Audience)
+
+	if !isValidAudience {
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Token audience mismatch")
+		helpers.LogInfo("GoogleAuthHandler", "audience mismatch",
+			"token_aud", payload.Audience,
+			"expected_one_of", trustedClientIDs)
 		return
 	}
 
 	googleId, ok := payload.Claims["sub"].(string)
 	if !ok || googleId == "" {
-		// CHANGED: This is a client error (malformed token), not a server error.
 		helpers.RespondWithError(w, http.StatusBadRequest, "invalid token: missing googleId (sub) claim")
-		// CHANGED: Use helper, log as Info (client-side error).
 		helpers.LogInfo("GoogleAuthHandler", "invalid token: missing googleId (sub) claim")
 		return
 	}
 	email, ok := payload.Claims["email"].(string)
 	if !ok || email == "" {
-		// CHANGED: This is a client error (malformed token), not a server error.
 		helpers.RespondWithError(w, http.StatusBadRequest, "invalid token: missing email claim")
-		// CHANGED: Use helper, log as Info (client-side error).
 		helpers.LogInfo("GoogleAuthHandler", "invalid token: missing email claim")
 		return
 	}
@@ -75,7 +86,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging. This is a real server error.
-		helpers.LogError("GoogleAuthHandler", "err in generateSecureRandomString", "error", err)
+		helpers.LogError("GoogleAuthHandler", "err in generateSecureRandomString", "error", err.Error())
 		return
 	}
 	hashedRandStr := hashToken(refreshToken)
@@ -86,7 +97,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "Failed to begin transaction", "error", err)
+		helpers.LogError("GoogleAuthHandler", "Failed to begin transaction", "error", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context()) // Rollback on any error
@@ -108,8 +119,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "error in tx UpsertUserByEmail", "error", err)
+		helpers.LogError("GoogleAuthHandler", "error in tx UpsertUserByEmail", "error", err.Error())
 		return // Rollback is deferred
 	}
 
@@ -127,16 +137,14 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "err in tx InsertRefreshToken", "error", err)
+		helpers.LogError("GoogleAuthHandler", "err in tx InsertRefreshToken", "error", err.Error())
 		return // Rollback is deferred
 	}
 
 	// 3c. Commit the transaction
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "Failed to commit transaction", "error", err)
+		helpers.LogError("GoogleAuthHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
 
@@ -152,16 +160,13 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	}, h.jwtSecret)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		// CHANGED: Use helper for structured logging.
-		helpers.LogError("GoogleAuthHandler", "error in signing the jwt token", "error", err)
+		helpers.LogError("GoogleAuthHandler", "error in signing the jwt token", "error", err.Error())
 		return
 	}
 
 	// ---------------------------------------------------------------------------------------------------
 	// 5. Send Response
-	// TODO: [SECURITY] Remove this in production. Logging raw AccessTokens and RefreshTokens is a security risk.
-	helpers.LogInfo("GoogleAuthHandler", "response", resType{User: user, AccessToken: accessToken, RefreshToken: refreshToken})
-
+	helpers.LogInfo("GoogleAuthHandler", "response", "user_id", user.ID, "username", user.Name.String)
 	helpers.RespondWithJSON(w, 201, resType{
 		User:         user,
 		AccessToken:  accessToken,

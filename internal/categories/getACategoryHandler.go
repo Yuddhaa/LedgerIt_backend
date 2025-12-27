@@ -34,10 +34,10 @@ func (h *Handler) GetACategoryHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("GetACategoryHandler", "Db error in GetCategory", "err", err, "categoryId", categoryId)
+		helpers.LogError("GetACategoryHandler", "Db error in GetCategory", "err", err.Error(), "categoryId", categoryId)
 		return
 	}
 	res := resType{Category: category}
-	helpers.LogInfo("GetACategoryHandler", "response sent", "response", res)
+	helpers.LogInfo("GetACategoryHandler", "response sent", "categoryId", categoryId)
 	helpers.RespondWithJSON(w, 200, res)
 }

@@ -31,9 +31,9 @@ func (h *Handler) DeletePartyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("DeletePartyHandler", "Db error in DeleteParty", "err", err)
+		helpers.LogError("DeletePartyHandler", "Db error in DeleteParty", "err", err.Error())
 		return
 	}
-	helpers.LogInfo("DeletePartyHandler", "204 response sent")
+	helpers.LogInfo("DeletePartyHandler", "party deleted: 204 response sent")
 	w.WriteHeader(http.StatusNoContent)
 }

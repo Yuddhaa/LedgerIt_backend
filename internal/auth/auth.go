@@ -36,34 +36,48 @@ const userClaimsKey contextKey = "userClaims"
 
 // Handler holds dependencies for auth-related HTTP handlers.
 type Handler struct {
-	logger         *slog.Logger
-	db             *db.Queries
-	pool           *pgxpool.Pool
-	googleClientId string
-	jwtSecret      string
+	logger          *slog.Logger
+	db              *db.Queries
+	pool            *pgxpool.Pool
+	googleClientId  string
+	googleAndroidId string
+	googleIOSId     string
+	jwtSecret       string
 }
 
 // NewHandler creates a new auth Handler, validating required environment variables.
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) (*Handler, error) {
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
+	googleClientID := os.Getenv("GOOGLE_WEB_CLIENT_ID")
 	if googleClientID == "" {
-		// This is a fatal startup error, log it as such.
-		helpers.LogError("auth.NewHandler", "GOOGLE_CLIENT_ID is not set in environment")
-		return nil, fmt.Errorf("GOOGLE_CLIENT_ID is not set")
+		helpers.LogError("auth.NewHandler", "GOOGLE_WEB_CLIENT_ID is not set in environment")
+		return nil, fmt.Errorf("GOOGLE_WEB_CLIENT_ID is not set")
+	}
+
+	googleAndroidId := os.Getenv("GOOGLE_ANDROID_ID")
+	if googleClientID == "" {
+		helpers.LogError("auth.NewHandler", "GOOGLE_ANDROID_ID is not set in environment")
+		return nil, fmt.Errorf("GOOGLE_ANDROID_ID is not set")
+	}
+
+	googleIOSId := os.Getenv("GOOGLE_IOS_ID")
+	if googleClientID == "" {
+		helpers.LogError("auth.NewHandler", "GOOGLE_IOS_ID is not set in environment")
+		return nil, fmt.Errorf("GOOGLE_IOS_ID is not set")
 	}
 
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
-		// This is also a fatal startup error.
 		helpers.LogError("auth.NewHandler", "JWT_SECRET is not set in environment")
 		return nil, fmt.Errorf("JWT_SECRET is not set")
 	}
 	return &Handler{
-		logger:         logger,
-		db:             db,
-		pool:           pool,
-		googleClientId: googleClientID,
-		jwtSecret:      jwtSecret,
+		logger:          logger,
+		db:              db,
+		pool:            pool,
+		googleClientId:  googleClientID,
+		googleAndroidId: googleAndroidId,
+		googleIOSId:     googleIOSId,
+		jwtSecret:       jwtSecret,
 	}, nil
 }
 
@@ -98,7 +112,7 @@ func GenerateJwt(jwtClaims *Claims, jwtSecret string) (string, error) {
 	jwt, err := token.SignedString([]byte(jwtSecret))
 	if err != nil {
 		// This is a server-side error during the token signing process.
-		helpers.LogError("auth.GenerateJwt", "failed to sign JWT", "error", err)
+		helpers.LogError("auth.GenerateJwt", "failed to sign JWT", "error", err.Error())
 		return "", err
 	}
 	return jwt, nil
@@ -182,7 +196,7 @@ func GetUserIdFromContext(w http.ResponseWriter, r *http.Request) (pgtype.UUID, 
 	userUuid, err := uuid.Parse(userId)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("GetUserIdFromContext", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
+		helpers.LogError("GetUserIdFromContext", "error in converting userId to uuid", "error", err.Error(), "user_id_from_claim", userId)
 		return pgtype.UUID{}, false
 	}
 	return pgtype.UUID{
@@ -197,7 +211,7 @@ func ExtractUUID(w http.ResponseWriter, r *http.Request, variable string) (pgtyp
 	UUID, err := uuid.Parse(uuidStr)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Url Param")
-		helpers.LogError("ExtractBusinessUUID", "bad url param", "Err", err)
+		helpers.LogError("ExtractUUID", "bad url param:"+variable, "err", err.Error())
 		return pgtype.UUID{}, false
 	}
 	return pgtype.UUID{
@@ -211,6 +225,20 @@ func ExtractUUID(w http.ResponseWriter, r *http.Request, variable string) (pgtyp
 func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
 	claims, ok := ctx.Value(userClaimsKey).(*Claims)
 	return claims, ok
+}
+
+// GetUserRole extract and returns user id form context
+// 1 - creator
+// 2 - employee
+// 3 - admin
+func GetUserRoleFromContext(w http.ResponseWriter, r *http.Request) (int, bool) {
+	role, ok := r.Context().Value("role").(int)
+	if !ok {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve role from context")
+		helpers.LogError("GetUserRoleFromContext", "could not retrieve role from context")
+		return role, false
+	}
+	return role, true
 }
 
 // uuidToString converts a pgtype.UUID to its string representation.
@@ -234,8 +262,8 @@ func generateSecureRandomString(n int) (string, error) {
 	b := make([]byte, n)
 	if _, err := rand.Read(b); err != nil {
 		// This is a rare, critical system-level error.
-		helpers.LogError("auth.generateSecureRandomString", "failed to read from crypto/rand", "error", err)
-		return "", fmt.Errorf("failed to read from crypto/rand: %w", err)
+		helpers.LogError("auth.generateSecureRandomString", "failed to read from crypto/rand", "error", err.Error())
+		return "", fmt.Errorf("failed to read from crypto/rand: %w", err.Error())
 	}
 
 	return hex.EncodeToString(b), nil

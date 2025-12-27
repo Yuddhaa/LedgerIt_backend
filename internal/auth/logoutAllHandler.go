@@ -25,32 +25,6 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 		RefreshToken string `json:"refresh_token"`
 	}
 
-	// ---------------------------------------------------------------------------------------------------
-	// // 1. Get Claims from context
-	// claims, ok := GetClaimsFromContext(r.Context())
-	// if !ok {
-	// 	helpers.RespondWithError(w, http.StatusInternalServerError, "could not retrieve claims from context")
-	// 	// CHANGED: This is a server error; the middleware should guarantee claims.
-	// 	helpers.LogError("LogoutAllHandler", "could not retrieve claims from context")
-	// 	return
-	// }
-	//
-	// // ---------------------------------------------------------------------------------------------------
-	// // 2. Prepare all data *before* the transaction
-	//
-	// // Get User ID and convert
-	// userId := claims.UserId
-	// userUuid, err := uuid.Parse(userId)
-	// if err != nil {
-	// 	helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-	// 	// CHANGED: This is a critical server error; claims are malformed.
-	// 	helpers.LogError("LogoutAllHandler", "error in converting userId to uuid", "error", err, "user_id_from_claim", userId)
-	// 	return
-	// }
-	// pgTypeUuid := pgtype.UUID{
-	// 	Bytes: userUuid,
-	// 	Valid: userUuid != uuid.Nil,
-	// }
 	userId, ok := GetUserIdFromContext(w, r)
 	if !ok {
 		return
@@ -61,7 +35,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "err in generateSecureRandomString", "error", err)
+		helpers.LogError("LogoutAllHandler", "err in generateSecureRandomString", "error", err.Error())
 		return
 	}
 	hashedRandStr := hashToken(refreshToken)
@@ -73,7 +47,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error starting transaction")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "Failed to begin transaction", "error", err)
+		helpers.LogError("LogoutAllHandler", "Failed to begin transaction", "error", err.Error())
 		return
 	}
 	defer tx.Rollback(r.Context())
@@ -84,7 +58,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err := qtx.DeleteRefreshTokensByUserID(r.Context(), userId); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "error in tx DeleteRefreshTokensByUserID", "error", err, "user_id", userId)
+		helpers.LogError("LogoutAllHandler", "error in tx DeleteRefreshTokensByUserID", "error", err.Error(), "user_id", userId)
 		return // Rollback is deferred
 	}
 
@@ -103,7 +77,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	}); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "err in tx InsertRefreshToken", "error", err, "user_id", userId)
+		helpers.LogError("LogoutAllHandler", "err in tx InsertRefreshToken", "error", err.Error(), "user_id", userId)
 		return // Rollback is deferred
 	}
 
@@ -111,7 +85,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error committing transaction")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "Failed to commit transaction", "error", err)
+		helpers.LogError("LogoutAllHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
 
@@ -128,7 +102,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.
-		helpers.LogError("LogoutAllHandler", "error in signing the jwt token", "error", err)
+		helpers.LogError("LogoutAllHandler", "error in signing the jwt token", "error", err.Error())
 		return
 	}
 

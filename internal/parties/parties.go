@@ -106,7 +106,7 @@ func (h *Handler) CheckMember(next http.Handler) http.Handler {
 				return
 			}
 			helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
-			helpers.LogError("CheckMember", "Internal server error", "err", err, "userId", userId, "businessId", businessId)
+			helpers.LogError("CheckMember", "Internal server error", "err", err.Error(), "userId", userId, "businessId", businessId)
 			return
 		}
 

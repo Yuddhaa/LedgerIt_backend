@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"LedgerIt/internal/admin"
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/business"
 	"LedgerIt/internal/categories"
@@ -55,9 +56,15 @@ func (s *Server) setupRouter() {
 
 	// Apply CORS globally to all handlers
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   []string{"http://localhost:8000"},
+		AllowedOrigins: []string{
+			"http://localhost:3000",  // optional (web dev)
+			"http://localhost:8000",  // optional (web dev)
+			"http://localhost:19006", // Expo dev
+			"https://ledgerit-backend.onrender.com",
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		ExposedHeaders:   []string{"Authorization"},
 		AllowCredentials: true,
 		MaxAge:           300,
 	}))
@@ -68,14 +75,17 @@ func (s *Server) setupRouter() {
 	authHandler, err := auth.NewHandler(s.db, s.pool, s.logger)
 	if err != nil {
 		// This is a fatal error during startup, so we log and exit.
-		helpers.LogError("setupRouter", "error in intialising authHandler", "err", err)
+		helpers.LogError("setupRouter", "error in intialising authHandler", "err", err.Error())
 		os.Exit(1)
 	}
 	userHandler := users.NewHandler(s.db, s.pool, s.logger)
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
-	transactionsHandler := transactions.NewHandler(s.db, s.pool)
 	partiesHandler := parties.NewHandler(s.db, s.pool)
 	categoriesHandler := categories.NewHandler(s.db, s.pool)
+
+	// for transactionshandler
+	dbStore := db.NewDBStore(s.pool)
+	transactionsHandler := transactions.NewHandler(dbStore)
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -95,6 +105,9 @@ func (s *Server) setupRouter() {
 			w.Write([]byte("hello!! accessToken is still valid and Server is up and running"))
 		})
 
+		// ws route to log
+		r.Get("/admin/logs", admin.Hub.HandleLogs)
+
 		r.Mount("/api/v1/users/", userHandler.Routes())
 		r.Mount("/api/v1/business/", businessHandler.Routes())
 		r.Mount("/api/v1/business/{id}/transactions", transactionsHandler.Routes())
@@ -112,17 +125,14 @@ func (s *Server) SlogLoggerMiddleware(next http.Handler) http.Handler {
 		// Get the RequestID from the context (set by middleware.RequestID)
 		reqID := middleware.GetReqID(r.Context())
 
-		// CHANGED: Use helpers.LogInfo to get both file and console logging.
 		helpers.LogInfo("SlogLoggerMiddleware", "incoming request",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"request_id", reqID, // ADDED: Tracing the request ID
+			"origin", r.Header.Get("Origin"),
 		)
 
 		// Pass the request to the next handler
 		next.ServeHTTP(w, r)
 	})
 }
-
-// DELETED: This function is now replaced by SlogLoggerMiddleware
-// func (s *Server) SimpleSlogLogger(next http.Handler) http.Handler { ... }

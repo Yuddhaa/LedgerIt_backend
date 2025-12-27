@@ -40,12 +40,9 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: This is a client error, log as Info.
-		helpers.LogInfo("RefreshHandler", "failed to decode request body", "error", err)
+		helpers.LogError("RefreshHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
-
-	// TODO: [SECURITY] Remove this in production. Logging the raw RefreshToken is a security risk.
-	helpers.LogInfo("RefreshHandler", "body decoded", "body", body)
 
 	// ---------------------------------------------------------------------------------------------------
 	// Hash the incoming token
@@ -53,6 +50,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ---------------------------------------------------------------------------------------------------
 	// 1. GET: Find the token. This can happen *before* the transaction.
+	helpers.LogInfo("RefreshHandler", "before GetRefreshTokenByHash")
 	row, err := h.db.GetRefreshTokenByHash(r.Context(), hashedToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -64,10 +62,11 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 			// This is a real database error.
 			helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 			// CHANGED: Slightly more specific message.
-			helpers.LogError("RefreshHandler", "failed to get refresh token by hash", "error", err)
+			helpers.LogError("RefreshHandler", "failed to get refresh token by hash", "error", err.Error())
 			return
 		}
 	}
+	helpers.LogInfo("RefreshHandler", "after GetRefreshTokenByHash")
 
 	// ---------------------------------------------------------------------------------------------------
 	// 2. GENERATE: Create new tokens *before* starting the DB transaction.
@@ -83,7 +82,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	}, h.jwtSecret)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		helpers.LogError("RefreshHandler", "error in signing the jwt token", "error", err)
+		helpers.LogError("RefreshHandler", "error in signing the jwt token", "error", err.Error())
 		return
 	}
 
@@ -91,7 +90,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	newRefreshToken, err := generateSecureRandomString(32)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
-		helpers.LogError("RefreshHandler", "error in generateSecureRandomString", "error", err)
+		helpers.LogError("RefreshHandler", "error in generateSecureRandomString", "error", err.Error())
 		return
 	}
 	newHashedToken := hashToken(newRefreshToken)
@@ -100,17 +99,19 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	// ---------------------------------------------------------------------------------------------------
 	// 3. TRANSACTION: Begin atomic database operation
 
+	helpers.LogInfo("RefreshHandler", "before Begin tx")
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error starting transaction")
-		helpers.LogError("RefreshHandler", "Failed to begin transaction", "error", err)
+		helpers.LogError("RefreshHandler", "Failed to begin transaction", "error", err.Error())
 		return
 	}
 	// Defer a rollback. If Commit() is called, this does nothing.
 	defer tx.Rollback(r.Context())
+	helpers.LogInfo("RefreshHandler", "after Begin tx")
 
 	qtx := h.db.WithTx(tx)
-
+	helpers.LogInfo("RefreshHandler", "before InsertRefreshToken")
 	// 3a. INSERT the new token
 	if _, err := qtx.InsertRefreshToken(r.Context(), db.InsertRefreshTokenParams{
 		UserID:    row.UserID,
@@ -125,24 +126,26 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error saving new token")
-		helpers.LogError("RefreshHandler", "err in tx InsertRefreshToken", "error", err)
+		helpers.LogError("RefreshHandler", "err in tx InsertRefreshToken", "error", err.Error())
 		return // Rollback is deferred
 	}
-
+	helpers.LogInfo("RefreshHandler", "after InsertRefreshToken")
+	helpers.LogInfo("RefreshHandler", "before DeleteRefreshTokenByHash")
 	// 3b. DELETE the old token
 	if err := qtx.DeleteRefreshTokenByHash(r.Context(), hashedToken); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error invalidating old token")
-		helpers.LogError("RefreshHandler", "err in tx DeleteRefreshTokenByHash", "error", err)
+		helpers.LogError("RefreshHandler", "err in tx DeleteRefreshTokenByHash", "error", err.Error())
 		return // Rollback is deferred
 	}
-
+	helpers.LogInfo("RefreshHandler", "after DeleteRefreshTokenByHash")
+	helpers.LogInfo("RefreshHandler", "before commit")
 	// 3c. COMMIT: If all went well, commit the transaction.
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error committing transaction")
-		helpers.LogError("RefreshHandler", "Failed to commit transaction", "error", err)
+		helpers.LogError("RefreshHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
-
+	helpers.LogInfo("RefreshHandler", "after commit")
 	// ---------------------------------------------------------------------------------------------------
 	// 4. RESPOND: All database work is done. Send the new tokens to the client.
 	res := resType{
@@ -150,7 +153,6 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		AccessToken:  accessToken,
 	}
 
-	// TODO: [SECURITY] Remove this in production. Logging the new raw RefreshToken is a security risk.
-	helpers.LogInfo("RefreshHandler", "token refresh successful", "response", res)
+	helpers.LogInfo("RefreshHandler", "token refresh successful")
 	helpers.RespondWithJSON(w, 200, res)
 }

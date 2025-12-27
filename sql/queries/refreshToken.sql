@@ -28,3 +28,14 @@ WHERE token_hash = $1;
 -- This is used for the "log out from all devices" feature.
 DELETE FROM refresh_tokens
 WHERE user_id = $1;
+
+-- name: ListUserDevices :many
+-- get all active sessions/devices for a user
+SELECT 
+    id, 
+    device_info, 
+    created_at, 
+    expires_at 
+FROM refresh_tokens
+WHERE user_id = $1
+ORDER BY created_at DESC;

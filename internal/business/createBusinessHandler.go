@@ -22,7 +22,7 @@ func (h *Handler) CreateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
 		// CHANGED: Client error, log as Info.
-		helpers.LogInfo("CreateBusinessHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("CreateBusinessHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
 	// extract userId from r.context
@@ -37,9 +37,13 @@ func (h *Handler) CreateBusinessHandler(w http.ResponseWriter, r *http.Request) 
 		PName:    body.Name,
 	})
 	if err != nil {
-		// CHANGED: Don't leak DB error. Use structured logging.
+		if helpers.IsUniqueViolation(err) {
+			helpers.RespondWithError(w, http.StatusConflict, "Business already exists")
+			helpers.LogInfo("CreateBusinessHandler", "Business already exists")
+			return
+		}
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		helpers.LogError("CreateBusinessHandler", "db error in CreateBusinessAndAddOwner", "error", err)
+		helpers.LogError("CreateBusinessHandler", "db error in CreateBusinessAndAddOwner", "error", err.Error())
 		return
 	}
 

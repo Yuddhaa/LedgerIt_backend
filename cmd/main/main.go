@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"LedgerIt/internal/admin"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/server"
@@ -59,7 +60,7 @@ func main() {
 
 	cfg := loadConfig()
 
-	// --- DATABASE CONNECTION LOGIC (FIXED) ---
+	// --- DATABASE CONNECTION LOGIC
 
 	// 1. Create a context for the connection attempt
 	dbCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
@@ -68,30 +69,42 @@ func main() {
 	// 2. Parse the config first so we can modify it
 	dbConfig, err := pgxpool.ParseConfig(cfg.dbURL)
 	if err != nil {
-		helpers.LogError("main", "error parsing db config", "error", err)
+		helpers.LogError("main", "error parsing db config", "error", err.Error())
 		os.Exit(1)
 	}
 
-	// --- THE FIX FOR "conn busy" & RACE CONDITIONS ---
-	// Disable the implicit statement cache. This prevents the driver from trying
-	// to clean up prepared statements on a connection that was just cancelled.
 	dbConfig.ConnConfig.StatementCacheCapacity = 0
 	// -------------------------------------------------
 	dbConfig.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeSimpleProtocol
-	// 3. Create the Pool (Thread-safe, handles concurrency)
+
+	// --- NEW: STALE CONNECTION FIXES ---
+	// 1. HealthCheckPeriod: The pool will ping the DB every 15s to check if
+	//    idle connections are still alive. If one is dead, it is removed *before*
+	//    your request tries to use it.
+	dbConfig.HealthCheckPeriod = 15 * time.Second
+
+	// 2. MaxConnIdleTime: Close connections that haven't been used for 30s.
+	//    This prevents holding onto connections that the cloud firewall
+	//    is about to cut off anyway.
+	dbConfig.MaxConnIdleTime = 30 * time.Second
+
+	// 3. MaxConnLifetime: Recycle connections every 30m to prevent memory bloat/drift.
+	dbConfig.MaxConnLifetime = 30 * time.Minute
+
+	// 4. Min/Max Conns (Optional tune for Free Tier)
+	dbConfig.MinConns = 0
+	// If using Supabase Transaction pooler (port 6543), you can go higher (e.g., 20).
+	// If using Direct (port 5432), keep this lower (e.g., 10).
+	dbConfig.MaxConns = 10
+
+	// 3. Create the Pool
 	pool, err := pgxpool.NewWithConfig(dbCtx, dbConfig)
 	if err != nil {
-		helpers.LogError("main", "error connecting to db pool", "error", err)
+		helpers.LogError("main", "error connecting to db pool", "error", err.Error())
 		os.Exit(1)
 	}
-	defer pool.Close()
-
-	// 4. Verify connection
-	if err := pool.Ping(dbCtx); err != nil {
-		helpers.LogError("main", "error pinging db", "error", err)
-		os.Exit(1)
-	}
-
+	// Note: Do NOT defer pool.Close() here if this is inside a function that returns the pool.
+	// Only defer Close() in main() if the app is shutting down.
 	// 5. Initialize sqlc with the POOL
 	// Your db.New() accepts DBTX interface, which pgxpool.Pool satisfies.
 	// This ensures every query gets its own connection from the pool.
@@ -107,14 +120,14 @@ func main() {
 		Addr:    fmt.Sprintf(":%v", cfg.port),
 		Handler: srvr.Router,
 	}
-
+	go admin.Hub.Run()
 	go func() {
 		logger.Info(" ------------------------------------------------ ")
 		helpers.LogInfo("main", "Starting server", "port", cfg.port)
 		logger.Info(" ------------------------------------------------ ")
 
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			helpers.LogError("main", "Server error", "error", err)
+			helpers.LogError("main", "Server error", "error", err.Error())
 			os.Exit(1)
 		}
 	}()
@@ -130,7 +143,7 @@ func main() {
 	defer cancel()
 
 	if err := httpServer.Shutdown(ctx); err != nil {
-		helpers.LogError("main", "Server shutdown failed", "error", err)
+		helpers.LogError("main", "Server shutdown failed", "error", err.Error())
 		os.Exit(1)
 	}
 

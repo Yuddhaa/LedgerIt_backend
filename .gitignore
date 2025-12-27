@@ -5,5 +5,10 @@
 # .env file (for local secrets)
 .env
 
+.DS_Store
 log.log
 screens
+reports
+reports/*
+
+test.json

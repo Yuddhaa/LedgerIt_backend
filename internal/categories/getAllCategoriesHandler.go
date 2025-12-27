@@ -18,13 +18,12 @@ func (h *Handler) GetAllCategoriesHandler(w http.ResponseWriter, r *http.Request
 	}
 	categories, err := h.db.ListCategoriesByBusiness(r.Context(), businessId)
 	if err != nil {
-		helpers.LogError("GetAllCategoriesHandler", "error in ListCategoriesByBusiness", "err", err,
+		helpers.LogError("GetAllCategoriesHandler", "error in ListCategoriesByBusiness", "err", err.Error(),
 			"businessId", businessId)
 		helpers.RespondWithError(w, 500, "internal server error")
 		return
 	}
 	res := resType{Categories: categories}
-	helpers.LogInfo("GetAllCategoriesHandler", "response sent", "res", res, "count", len(res.Categories),
-		"businessId", businessId)
+	helpers.LogInfo("GetAllCategoriesHandler", "categories sent", "count", len(res.Categories), "businessId", businessId)
 	helpers.RespondWithJSON(w, 200, res)
 }

@@ -10,15 +10,17 @@ import (
 // Based on our main.go, this logger *only* writes compact JSON to "log.log".
 var Logger *slog.Logger
 
-// logIndentedToConsole is a helper to manually create and print
-// indented JSON to the console (os.Stdout).
+// LogStreamHook is a function that will be called for every log entry.
+// We will assign the WebSocket broadcaster to this later.
+var LogStreamHook func(entry map[string]any)
+
+// logIndentedToConsole is a helper to manually create and print...
 func logIndentedToConsole(level, calling, msg string, data ...any) {
 	// Create a map to hold all log attributes
 	temp := make(map[string]any)
 	temp["level"] = level
 	temp["msg"] = msg
 
-	// Add the 'source' attribute if provided
 	if calling != "" {
 		temp["source"] = calling
 	}
@@ -26,12 +28,9 @@ func logIndentedToConsole(level, calling, msg string, data ...any) {
 	// Safely parse the key-value pairs from data
 	n := len(data)
 	for i := 0; i < n; i += 2 {
-		// Ensure we don't go out of bounds
 		if i+1 >= n {
-			break // Or log a malformed data error
+			break
 		}
-
-		// Ensure the key is a string
 		key, ok := data[i].(string)
 		if !ok {
 			key = fmt.Sprintf("invalid_key_%d", i)
@@ -39,38 +38,34 @@ func logIndentedToConsole(level, calling, msg string, data ...any) {
 		temp[key] = data[i+1]
 	}
 
-	// Marshal the map with indentation
-	// Using "  " for indent is more standard than "   "
+	// 2. ADD THIS BLOCK
+	// If a hook is registered (WebSocket is running), send the data there.
+	if LogStreamHook != nil {
+		// We pass a copy or the map directly.
+		// Since we marshal immediately in the hook, passing map is fine.
+		LogStreamHook(temp)
+	}
+
+	// Marshal the map with indentation for Console
 	prettyJSON, err := json.MarshalIndent(temp, "", "  ")
 	if err != nil {
-		// Fallback if marshaling fails
-		fmt.Printf("{\"level\":\"ERROR\", \"msg\":\"failed to marshal log\", \"error\":\"%v\"}\n", err)
+		fmt.Printf("{\"level\":\"ERROR\", \"msg\":\"failed to marshal log\", \"error\":\"%v\"}\n", err.Error())
 		return
 	}
 
-	// Print the final indented JSON string to the console
 	fmt.Printf("\n%s\n", string(prettyJSON))
 }
 
-// LogError logs an ERROR message.
-// It writes compact JSON to the file AND indented JSON to the console.
+// ... LogError and LogInfo remain exactly the same ...
 func LogError(calling, msg string, data ...any) {
 	tempData := append(data, "source", calling)
-	// 1. Log compact JSON to log.log
 	Logger.Error(msg, tempData...)
-
-	// 2. Log indented JSON to the console
 	logIndentedToConsole("ERROR", calling, msg, data...)
 }
 
-// LogInfo logs an INFO message.
-// It writes compact JSON to the file AND indented JSON to the console.
 func LogInfo(calling, msg string, data ...any) {
 	tempData := append(data, "source", calling)
-	// 1. Log compact JSON to log.log
 	Logger.Info(msg, tempData...)
-
-	// 2. Log indented JSON to the console
 	logIndentedToConsole("INFO", calling, msg, data...)
 }
 
@@ -78,7 +73,7 @@ func LogInfo(calling, msg string, data ...any) {
 func PrintJson(msg string, payload any) {
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {
-		fmt.Printf("\n%s\nError marshaling JSON: %v\n", msg, err)
+		fmt.Printf("\n%s\nError marshaling JSON: %v\n", msg, err.Error())
 		return
 	}
 

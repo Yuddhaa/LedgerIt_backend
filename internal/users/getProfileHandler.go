@@ -31,11 +31,11 @@ func (h *Handler) GetProfileHandler(w http.ResponseWriter, r *http.Request) {
 			helpers.RespondWithError(w, 404, "No user found")
 			return
 		}
-		helpers.LogError("GetProfileHandler", "error in GetUserById", "err", err, "userId:", userId)
+		helpers.LogError("GetProfileHandler", "error in GetUserById", "err", err.Error(), "userId:", userId)
 		helpers.RespondWithError(w, 500, "Server Error in getting user details")
 		return
 	}
 	res := resType{User: user}
-	helpers.LogInfo("GetProfileHandler", "response sent", "response", res)
+	helpers.LogInfo("GetProfileHandler", "user profile sent", "userid", userId)
 	helpers.RespondWithJSON(w, 200, res)
 }

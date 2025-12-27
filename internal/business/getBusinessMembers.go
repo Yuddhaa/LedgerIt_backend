@@ -48,7 +48,7 @@ func (h *Handler) GetBusinessMembers(w http.ResponseWriter, r *http.Request) {
 		}
 		// Any other error is a 500
 		helpers.RespondWithError(w, 500, "internal server error during authorization")
-		helpers.LogError("GetBusinessMembers", "IsUserMemberOfBusiness db error", "err", err, "business_uuid", business_uuid, "user_id", userId)
+		helpers.LogError("GetBusinessMembers", "IsUserMemberOfBusiness db error", "err", err.Error(), "business_uuid", business_uuid, "user_id", userId)
 		return
 	}
 
@@ -60,12 +60,12 @@ func (h *Handler) GetBusinessMembers(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		helpers.RespondWithError(w, 500, "internal server error")
-		helpers.LogError("GetBusinessMembers", "GetBusinessMembers db error", "err", err, "business_uuid", business_uuid)
+		helpers.LogError("GetBusinessMembers", "GetBusinessMembers db error", "err", err.Error(), "business_uuid", business_uuid)
 		return
 	}
 	res := resType{
 		Members: members,
 	}
-	helpers.LogInfo("GetBusinessMembers", "response sent", "Members", members)
+	helpers.LogInfo("GetBusinessMembers", "response sent", "Members count", len(members))
 	helpers.RespondWithJSON(w, 200, res)
 }

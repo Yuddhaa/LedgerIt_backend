@@ -20,8 +20,14 @@ type Querier interface {
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	// add a new category
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
+	CreateEditRequest(ctx context.Context, arg CreateEditRequestParams) (TransactionEditRequest, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
+	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
+	// used to delete a business
+	DeleteBusiness(ctx context.Context, id pgtype.UUID) error
+	// used to remove business member
+	DeleteBusinessMember(ctx context.Context, arg DeleteBusinessMemberParams) error
 	// delete a particular category
 	DeleteCategory(ctx context.Context, arg DeleteCategoryParams) (pgtype.UUID, error)
 	// delete a particular party
@@ -44,14 +50,23 @@ type Querier interface {
 	GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
+	// used to get a member details
+	GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error)
 	// get a particular party
 	GetParty(ctx context.Context, arg GetPartyParams) (Party, error)
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
+	// 1. Joins for REQUESTED changes (from JSON)
+	// 2. NEW: Joins for ORIGINAL transaction (from Columns)
+	GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error)
+	// RETURNING id, created_at;
+	GetTransactionForUpdate(ctx context.Context, arg GetTransactionForUpdateParams) (Transaction, error)
 	GetUserByEmail(ctx context.Context, email string) (User, error)
 	GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 	GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (User, error)
+	// returns the role of the user
+	GetUserRole(ctx context.Context, arg GetUserRoleParams) (BusinessRole, error)
 	// InsertRefreshToken inserts a new refresh token into the database.
 	InsertRefreshToken(ctx context.Context, arg InsertRefreshTokenParams) (RefreshToken, error)
 	// returns 1 if a user is a member of the given businessId
@@ -64,13 +79,27 @@ type Querier interface {
 	ListPartiesByBusinessAndPlace(ctx context.Context, arg ListPartiesByBusinessAndPlaceParams) ([]Party, error)
 	// get all the unique places stored in parties table related to a businessId
 	ListUniquePartyPlacesByBusiness(ctx context.Context, businessID pgtype.UUID) ([]string, error)
+	// get all active sessions/devices for a user
+	ListUserDevices(ctx context.Context, userID pgtype.UUID) ([]ListUserDevicesRow, error)
 	ListUsers(ctx context.Context) ([]User, error)
+	// Join Users
+	// Join Requested Changes (from JSON)
+	// NEW: Join Original Transaction
+	PatchEditRequest(ctx context.Context, arg PatchEditRequestParams) (PatchEditRequestRow, error)
+	UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error)
+	// used to update role in business_members
+	UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error)
+	// used to update balance in transactions
+	UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error
 	// update a particular category
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
+	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
+	VerifyCategoryBelongsToBusiness(ctx context.Context, arg VerifyCategoryBelongsToBusinessParams) (bool, error)
+	VerifyPartyBelongsToBusiness(ctx context.Context, arg VerifyPartyBelongsToBusinessParams) (bool, error)
 }
 
 var _ Querier = (*Queries)(nil)

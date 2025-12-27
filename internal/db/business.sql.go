@@ -87,6 +87,31 @@ func (q *Queries) CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusin
 	return i, err
 }
 
+const deleteBusiness = `-- name: DeleteBusiness :exec
+DELETE FROM businesses WHERE id = $1
+`
+
+// used to delete a business
+func (q *Queries) DeleteBusiness(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteBusiness, id)
+	return err
+}
+
+const deleteBusinessMember = `-- name: DeleteBusinessMember :exec
+DELETE FROM business_members WHERE user_id = $1 AND business_id = $2
+`
+
+type DeleteBusinessMemberParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// used to remove business member
+func (q *Queries) DeleteBusinessMember(ctx context.Context, arg DeleteBusinessMemberParams) error {
+	_, err := q.db.Exec(ctx, deleteBusinessMember, arg.UserID, arg.BusinessID)
+	return err
+}
+
 const getBusinessByID = `-- name: GetBusinessByID :one
 SELECT b.id, b.name, b.owner_id, b.created_at, b.updated_at,bm.user_id,bm.role,bm.current_balance 
 FROM businesses b
@@ -262,6 +287,46 @@ func (q *Queries) GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (B
 	return role, err
 }
 
+const getMemberRoleBalance = `-- name: GetMemberRoleBalance :one
+Select role, current_balance FROM business_members WHERE user_id = $1 AND business_id = $2
+`
+
+type GetMemberRoleBalanceParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+type GetMemberRoleBalanceRow struct {
+	Role           BusinessRole   `json:"role"`
+	CurrentBalance pgtype.Numeric `json:"current_balance"`
+}
+
+// used to get a member details
+func (q *Queries) GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error) {
+	row := q.db.QueryRow(ctx, getMemberRoleBalance, arg.UserID, arg.BusinessID)
+	var i GetMemberRoleBalanceRow
+	err := row.Scan(&i.Role, &i.CurrentBalance)
+	return i, err
+}
+
+const getUserRole = `-- name: GetUserRole :one
+SELECT role FROM business_members
+WHERE user_id = $1 AND business_id = $2
+`
+
+type GetUserRoleParams struct {
+	UserID     pgtype.UUID `json:"user_id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+// returns the role of the user
+func (q *Queries) GetUserRole(ctx context.Context, arg GetUserRoleParams) (BusinessRole, error) {
+	row := q.db.QueryRow(ctx, getUserRole, arg.UserID, arg.BusinessID)
+	var role BusinessRole
+	err := row.Scan(&role)
+	return role, err
+}
+
 const isUserMemberOfBusiness = `-- name: IsUserMemberOfBusiness :one
 SELECT 1
 FROM business_members
@@ -279,4 +344,78 @@ func (q *Queries) IsUserMemberOfBusiness(ctx context.Context, arg IsUserMemberOf
 	var column_1 int32
 	err := row.Scan(&column_1)
 	return column_1, err
+}
+
+const updateBusiness = `-- name: UpdateBusiness :one
+UPDATE businesses
+SET
+  name = $2,
+  updated_at = NOW()
+WHERE
+  id = $1
+RETURNING id, name, owner_id, created_at, updated_at
+`
+
+type UpdateBusinessParams struct {
+	ID   pgtype.UUID `json:"id"`
+	Name string      `json:"name"`
+}
+
+func (q *Queries) UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) (Business, error) {
+	row := q.db.QueryRow(ctx, updateBusiness, arg.ID, arg.Name)
+	var i Business
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateBusinessMember = `-- name: UpdateBusinessMember :one
+UPDATE business_members
+SET role = $1
+WHERE user_id = $2 AND business_id = $3
+RETURNING id, user_id, business_id, role, current_balance, created_at
+`
+
+type UpdateBusinessMemberParams struct {
+	Role       BusinessRole `json:"role"`
+	UserID     pgtype.UUID  `json:"user_id"`
+	BusinessID pgtype.UUID  `json:"business_id"`
+}
+
+// used to update role in business_members
+func (q *Queries) UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error) {
+	row := q.db.QueryRow(ctx, updateBusinessMember, arg.Role, arg.UserID, arg.BusinessID)
+	var i BusinessMember
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.BusinessID,
+		&i.Role,
+		&i.CurrentBalance,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateBusinessMemberBalance = `-- name: UpdateBusinessMemberBalance :exec
+UPDATE business_members
+SET current_balance = current_balance + $1
+WHERE user_id = $2 AND business_id = $3
+`
+
+type UpdateBusinessMemberBalanceParams struct {
+	CurrentBalance pgtype.Numeric `json:"current_balance"`
+	UserID         pgtype.UUID    `json:"user_id"`
+	BusinessID     pgtype.UUID    `json:"business_id"`
+}
+
+// used to update balance in transactions
+func (q *Queries) UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error {
+	_, err := q.db.Exec(ctx, updateBusinessMemberBalance, arg.CurrentBalance, arg.UserID, arg.BusinessID)
+	return err
 }

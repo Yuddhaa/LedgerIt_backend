@@ -37,6 +37,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Put("/me", h.UpdateUserProfileHandler)
 	r.Get("/phone/{phone_no}", h.GetUserByPhone)
 	r.Get("/me", h.GetProfileHandler)
+	r.Get("/devices", h.GetLoggedInDevices)
 	return r
 }
 
@@ -56,7 +57,7 @@ func (h *Handler) getUserIDFromContext(w http.ResponseWriter, r *http.Request) (
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Claims are malformed, this is a server bug. Don't leak error.
-		helpers.LogError("getUserIDFromContext", "could not parse userId from claims", "error", err, "claim_user_id", claims.UserId)
+		helpers.LogError("getUserIDFromContext", "could not parse userId from claims", "error", err.Error(), "claim_user_id", claims.UserId)
 		return uuid.Nil, false
 	}
 

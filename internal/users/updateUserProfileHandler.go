@@ -29,7 +29,7 @@ func (h *Handler) UpdateUserProfileHandler(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Claims data is malformed, this is a server-side issue.
-		helpers.LogError("UpdateUserProfileHandler", "could not parse userId from claims", "error", err, "claim_user_id", userId)
+		helpers.LogError("UpdateUserProfileHandler", "could not parse userId from claims", "error", err.Error(), "claim_user_id", userId)
 		return
 	}
 
@@ -44,17 +44,9 @@ func (h *Handler) UpdateUserProfileHandler(w http.ResponseWriter, r *http.Reques
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: invalid JSON")
-		// CHANGED: This is a client error. Log as Info.
-		helpers.LogInfo("UpdateUserProfileHandler", "failed to decode request body", "error", err)
+		helpers.LogInfo("UpdateUserProfileHandler", "failed to decode request body", "error", err.Error())
 		return
 	}
-
-	// 3. Log the processing event
-	helpers.LogInfo("UpdateUserProfileHandler", "processing user profile update",
-		"user_id", userId,
-		"name", body.Name,
-		"phone", body.PhoneNumber,
-	)
 
 	// 4. Perform database update
 	user, err := h.db.UpdateUserProfile(r.Context(), db.UpdateUserProfileParams{
@@ -73,8 +65,7 @@ func (h *Handler) UpdateUserProfileHandler(w http.ResponseWriter, r *http.Reques
 	})
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-		// CHANGED: This is a 500 error. Use LogError and don't leak details.
-		helpers.LogError("UpdateUserProfileHandler", "error in sql UpdateUserProfile", "error", err, "user_id", userId)
+		helpers.LogError("UpdateUserProfileHandler", "error in sql UpdateUserProfile", "error", err.Error(), "user_id", userId)
 		return
 	}
 

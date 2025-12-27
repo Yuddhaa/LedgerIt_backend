@@ -4,6 +4,15 @@ SELECT * FROM create_business_and_add_owner(
     p_name := $2
 );
 
+-- name: UpdateBusiness :one
+UPDATE businesses
+SET
+  name = $2,
+  updated_at = NOW()
+WHERE
+  id = $1
+RETURNING *;
+
 -- Based on userid and businessid it will return role
 -- name: GetMemberRole :one
 Select bm.role from business_members bm WHERE bm.user_id = $1 AND bm.business_id = $2;
@@ -64,3 +73,34 @@ WHERE user_id = $1 AND business_id = $2;
 SELECT 1
 FROM business_members
 WHERE user_id = $1 AND business_id = $2 AND role in ('admin', 'creator');
+
+
+-- returns the role of the user
+-- name: GetUserRole :one
+SELECT role FROM business_members
+WHERE user_id = $1 AND business_id = $2;
+
+-- used to update balance in transactions
+-- name: UpdateBusinessMemberBalance :exec
+UPDATE business_members
+SET current_balance = current_balance + $1
+WHERE user_id = $2 AND business_id = $3;
+
+-- used to update role in business_members
+-- name: UpdateBusinessMember :one
+UPDATE business_members
+SET role = $1
+WHERE user_id = $2 AND business_id = $3
+RETURNING *;
+
+-- used to delete a business
+-- name: DeleteBusiness :exec
+DELETE FROM businesses WHERE id = $1;
+
+-- used to remove business member
+-- name: DeleteBusinessMember :exec
+DELETE FROM business_members WHERE user_id = $1 AND business_id = $2;
+
+-- used to get a member details
+-- name: GetMemberRoleBalance :one
+Select role, current_balance FROM business_members WHERE user_id = $1 AND business_id = $2;

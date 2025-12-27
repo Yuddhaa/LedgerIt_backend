@@ -26,7 +26,7 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, 400, "Bad Request")
-		helpers.LogError("UpdatePartyHandler", "bad request body", "err", err)
+		helpers.LogError("UpdatePartyHandler", "bad request body", "err", err.Error())
 		return
 	}
 	businessId, ok := auth.ExtractUUID(w, r, "id")
@@ -60,10 +60,10 @@ func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		helpers.RespondWithError(w, 500, "Internal server error")
-		helpers.LogError("UpdatePartyHandler", "Db error in UpdateParty", "err", err, "body", body)
+		helpers.LogError("UpdatePartyHandler", "Db error in UpdateParty", "err", err.Error(), "party_id", partyId)
 		return
 	}
 	res := resType{Party: party}
-	helpers.LogInfo("UpdatePartyHandler", "response sent", "res", res)
+	helpers.LogInfo("UpdatePartyHandler", "party updated", "partyId", partyId)
 	helpers.RespondWithJSON(w, 200, res)
 }
