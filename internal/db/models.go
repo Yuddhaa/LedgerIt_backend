@@ -140,6 +140,184 @@ func (ns NullEditRequestStatus) Value() (driver.Value, error) {
 	return string(ns.EditRequestStatus), nil
 }
 
+type MarketerPayoutsMethod string
+
+const (
+	MarketerPayoutsMethodUPI  MarketerPayoutsMethod = "UPI"
+	MarketerPayoutsMethodNEFT MarketerPayoutsMethod = "NEFT"
+	MarketerPayoutsMethodCASH MarketerPayoutsMethod = "CASH"
+)
+
+func (e *MarketerPayoutsMethod) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = MarketerPayoutsMethod(s)
+	case string:
+		*e = MarketerPayoutsMethod(s)
+	default:
+		return fmt.Errorf("unsupported scan type for MarketerPayoutsMethod: %T", src)
+	}
+	return nil
+}
+
+type NullMarketerPayoutsMethod struct {
+	MarketerPayoutsMethod MarketerPayoutsMethod `json:"marketer_payouts_method"`
+	Valid                 bool                  `json:"valid"` // Valid is true if MarketerPayoutsMethod is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullMarketerPayoutsMethod) Scan(value interface{}) error {
+	if value == nil {
+		ns.MarketerPayoutsMethod, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.MarketerPayoutsMethod.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullMarketerPayoutsMethod) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.MarketerPayoutsMethod), nil
+}
+
+type PlansPeriod string
+
+const (
+	PlansPeriodMonth     PlansPeriod = "month"
+	PlansPeriodYear      PlansPeriod = "year"
+	PlansPeriodPermanent PlansPeriod = "permanent"
+)
+
+func (e *PlansPeriod) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = PlansPeriod(s)
+	case string:
+		*e = PlansPeriod(s)
+	default:
+		return fmt.Errorf("unsupported scan type for PlansPeriod: %T", src)
+	}
+	return nil
+}
+
+type NullPlansPeriod struct {
+	PlansPeriod PlansPeriod `json:"plans_period"`
+	Valid       bool        `json:"valid"` // Valid is true if PlansPeriod is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullPlansPeriod) Scan(value interface{}) error {
+	if value == nil {
+		ns.PlansPeriod, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.PlansPeriod.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullPlansPeriod) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.PlansPeriod), nil
+}
+
+type SubscriptionInvoicesStatus string
+
+const (
+	SubscriptionInvoicesStatusPending  SubscriptionInvoicesStatus = "pending"
+	SubscriptionInvoicesStatusPaid     SubscriptionInvoicesStatus = "paid"
+	SubscriptionInvoicesStatusFailed   SubscriptionInvoicesStatus = "failed"
+	SubscriptionInvoicesStatusRefunded SubscriptionInvoicesStatus = "refunded"
+)
+
+func (e *SubscriptionInvoicesStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SubscriptionInvoicesStatus(s)
+	case string:
+		*e = SubscriptionInvoicesStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SubscriptionInvoicesStatus: %T", src)
+	}
+	return nil
+}
+
+type NullSubscriptionInvoicesStatus struct {
+	SubscriptionInvoicesStatus SubscriptionInvoicesStatus `json:"subscription_invoices_status"`
+	Valid                      bool                       `json:"valid"` // Valid is true if SubscriptionInvoicesStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSubscriptionInvoicesStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.SubscriptionInvoicesStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SubscriptionInvoicesStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSubscriptionInvoicesStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SubscriptionInvoicesStatus), nil
+}
+
+type SubscriptionsStatus string
+
+const (
+	SubscriptionsStatusInactive SubscriptionsStatus = "inactive"
+	SubscriptionsStatusCreated  SubscriptionsStatus = "created"
+	SubscriptionsStatusTrialing SubscriptionsStatus = "trialing"
+	SubscriptionsStatusActive   SubscriptionsStatus = "active"
+	SubscriptionsStatusPastDue  SubscriptionsStatus = "past_due"
+	SubscriptionsStatusPaused   SubscriptionsStatus = "paused"
+	SubscriptionsStatusCanceled SubscriptionsStatus = "canceled"
+	SubscriptionsStatusExpired  SubscriptionsStatus = "expired"
+)
+
+func (e *SubscriptionsStatus) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = SubscriptionsStatus(s)
+	case string:
+		*e = SubscriptionsStatus(s)
+	default:
+		return fmt.Errorf("unsupported scan type for SubscriptionsStatus: %T", src)
+	}
+	return nil
+}
+
+type NullSubscriptionsStatus struct {
+	SubscriptionsStatus SubscriptionsStatus `json:"subscriptions_status"`
+	Valid               bool                `json:"valid"` // Valid is true if SubscriptionsStatus is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullSubscriptionsStatus) Scan(value interface{}) error {
+	if value == nil {
+		ns.SubscriptionsStatus, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.SubscriptionsStatus.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullSubscriptionsStatus) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.SubscriptionsStatus), nil
+}
+
 type TransactionChangeType string
 
 const (
@@ -268,11 +446,15 @@ func (ns NullTransactionMode) Value() (driver.Value, error) {
 }
 
 type Business struct {
-	ID        pgtype.UUID        `json:"id"`
-	Name      string             `json:"name"`
-	OwnerID   pgtype.UUID        `json:"owner_id"`
-	CreatedAt pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt pgtype.Timestamptz `json:"updated_at"`
+	ID                  pgtype.UUID             `json:"id"`
+	Name                string                  `json:"name"`
+	OwnerID             pgtype.UUID             `json:"owner_id"`
+	CreatedAt           pgtype.Timestamptz      `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz      `json:"updated_at"`
+	CurrentPlanID       pgtype.Text             `json:"current_plan_id"`
+	SubscriptionsStatus NullSubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndDate pgtype.Timestamptz      `json:"subscription_end_date"`
+	IsTrialUsed         pgtype.Bool             `json:"is_trial_used"`
 }
 
 type BusinessMember struct {
@@ -296,6 +478,31 @@ type Deposit struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Marketer struct {
+	ID                pgtype.UUID        `json:"id"`
+	Name              string             `json:"name"`
+	Email             string             `json:"email"`
+	PasswordHash      string             `json:"password_hash"`
+	UpiOfferCode      string             `json:"upi_offer_code"`
+	UpiRazorpayID     string             `json:"upi_razorpay_id"`
+	CardOfferCode     string             `json:"card_offer_code"`
+	CardRazorpayID    string             `json:"card_razorpay_id"`
+	CommissionPercent int32              `json:"commission_percent"`
+	CommissionBalance int64              `json:"commission_balance"`
+	TotalCommission   int64              `json:"total_commission"`
+	CreatedAt         pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+}
+
+type MarketerPayout struct {
+	ID                   pgtype.UUID        `json:"id"`
+	MarketerID           pgtype.UUID        `json:"marketer_id"`
+	Amount               int64              `json:"amount"`
+	PaymentMethod        string             `json:"payment_method"`
+	TransactionReference string             `json:"transaction_reference"`
+	PaidAt               pgtype.Timestamptz `json:"paid_at"`
+}
+
 type Party struct {
 	ID          pgtype.UUID        `json:"id"`
 	Name        string             `json:"name"`
@@ -306,6 +513,19 @@ type Party struct {
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
 
+type Plan struct {
+	ID             string             `json:"id"`
+	RazorpayPlanID string             `json:"razorpay_plan_id"`
+	Name           string             `json:"name"`
+	Description    pgtype.Text        `json:"description"`
+	Amount         int64              `json:"amount"`
+	Currency       string             `json:"currency"`
+	UserLimit      int32              `json:"user_limit"`
+	Period         PlansPeriod        `json:"period"`
+	Active         pgtype.Bool        `json:"active"`
+	CreatedAt      pgtype.Timestamptz `json:"created_at"`
+}
+
 type RefreshToken struct {
 	ID         pgtype.UUID        `json:"id"`
 	UserID     pgtype.UUID        `json:"user_id"`
@@ -313,6 +533,31 @@ type RefreshToken struct {
 	ExpiresAt  pgtype.Timestamptz `json:"expires_at"`
 	DeviceInfo pgtype.Text        `json:"device_info"`
 	CreatedAt  pgtype.Timestamptz `json:"created_at"`
+}
+
+type Subscription struct {
+	ID                     pgtype.UUID         `json:"id"`
+	BusinessID             pgtype.UUID         `json:"business_id"`
+	PlanID                 string              `json:"plan_id"`
+	MarketerID             pgtype.UUID         `json:"marketer_id"`
+	RazorpaySubscriptionID pgtype.Text         `json:"razorpay_subscription_id"`
+	CurrentPeriodStart     pgtype.Timestamptz  `json:"current_period_start"`
+	CurrentPeriodEnd       pgtype.Timestamptz  `json:"current_period_end"`
+	Status                 SubscriptionsStatus `json:"status"`
+	IsOfferApplied         pgtype.Bool         `json:"is_offer_applied"`
+	CreatedAt              pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt              pgtype.Timestamptz  `json:"updated_at"`
+}
+
+type SubscriptionInvoice struct {
+	ID                pgtype.UUID                `json:"id"`
+	SubscriptionID    pgtype.UUID                `json:"subscription_id"`
+	BusinessID        pgtype.UUID                `json:"business_id"`
+	RazorpayPaymentID string                     `json:"razorpay_payment_id"`
+	AmountPaid        int64                      `json:"amount_paid"`
+	Currency          pgtype.Text                `json:"currency"`
+	Status            SubscriptionInvoicesStatus `json:"status"`
+	CreatedAt         pgtype.Timestamptz         `json:"created_at"`
 }
 
 type Transaction struct {

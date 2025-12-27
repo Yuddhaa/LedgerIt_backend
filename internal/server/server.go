@@ -12,6 +12,7 @@ import (
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/parties"
+	"LedgerIt/internal/subscriptions"
 	"LedgerIt/internal/transactions"
 	"LedgerIt/internal/users"
 
@@ -82,6 +83,7 @@ func (s *Server) setupRouter() {
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
 	partiesHandler := parties.NewHandler(s.db, s.pool)
 	categoriesHandler := categories.NewHandler(s.db, s.pool)
+	subscriptionsHandler := subscriptions.NewHandler(s.db, s.pool)
 
 	// for transactionshandler
 	dbStore := db.NewDBStore(s.pool)
@@ -108,11 +110,14 @@ func (s *Server) setupRouter() {
 		// ws route to log
 		r.Get("/admin/logs", admin.Hub.HandleLogs)
 
+		r.Get("/api/v1/plans", s.GetPlansHandler)
+
 		r.Mount("/api/v1/users/", userHandler.Routes())
 		r.Mount("/api/v1/business/", businessHandler.Routes())
 		r.Mount("/api/v1/business/{id}/transactions", transactionsHandler.Routes())
 		r.Mount("/api/v1/business/{id}/parties", partiesHandler.Routes())
 		r.Mount("/api/v1/business/{id}/categories", categoriesHandler.Routes())
+		r.Mount("/api/v1/business/{id}/subscriptions", subscriptionsHandler.Routes())
 	})
 
 	s.Router = r

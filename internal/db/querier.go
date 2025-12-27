@@ -17,6 +17,9 @@ type Querier interface {
 	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
 	// returns 1 if a user is a member of a given business_id
 	CheckMember(ctx context.Context, arg CheckMemberParams) (int32, error)
+	// CheckUserPlanEligibility checks if the user has free businesses
+	// or trial period available
+	CheckUserPlanEligibility(ctx context.Context, ownerID pgtype.UUID) (CheckUserPlanEligibilityRow, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	// add a new category
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
@@ -40,6 +43,8 @@ type Querier interface {
 	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
 	// Retrieves a single business record by its unique ID.
 	GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error)
+	// GetBusinessCurrentPlan gets the details on the current plan
+	GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (GetBusinessCurrentPlanRow, error)
 	// GetBusinessMembers returns all the particular business members
 	GetBusinessMembers(ctx context.Context, businessID pgtype.UUID) ([]GetBusinessMembersRow, error)
 	// Retrieves all businesses owned by a specific user ID.

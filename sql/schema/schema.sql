@@ -157,6 +157,112 @@ CREATE INDEX idx_deposits_depositer_id ON deposits(depositer_id);
 CREATE INDEX idx_deposits_reviewer_id ON deposits(reviewer_id);
 CREATE INDEX idx_deposits_status ON deposits(status);
 
+-- subscription related
+
+CREATE TYPE plans_period AS ENUM ('month','year','permanent');
+
+CREATE TABLE plans (
+  id TEXT PRIMARY KEY,
+  razorpay_plan_id TEXT NOT NULL,
+  name TEXT NOT NULL,
+  description TEXT,
+
+  amount BIGINT NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'INR',
+
+  user_limit INT NOT NULL,
+
+  period plans_period NOT NULL DEFAULT 'month',
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE marketers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  password_hash TEXT NOT NULL,
+
+  upi_offer_code TEXT UNIQUE NOT NULL,
+  upi_razorpay_id TEXT UNIQUE NOT NULL,
+  card_offer_code TEXT UNIQUE NOT NULL,
+  card_razorpay_id TEXT UNIQUE NOT NULL,
+
+  commission_percent INT NOT NULL CHECK (commission_percent BETWEEN 0 AND 40),
+  commission_balance BIGINT NOT NULL DEFAULT 0, 
+  total_commission BIGINT NOT NULL DEFAULT 0,
+
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+
+CREATE TYPE subscriptions_status AS ENUM ( 'inactive', 'created', 'trialing', 'active', 
+    'past_due', 'paused', 'canceled', 'expired'
+);
+
+CREATE TABLE subscriptions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+  plan_id TEXT NOT NULL REFERENCES plans(id),
+
+  marketer_id UUID REFERENCES marketers(id) ON DELETE SET NULL,
+
+  razorpay_subscription_id TEXT UNIQUE,
+  current_period_start TIMESTAMPTZ NOT NULL,
+  current_period_end TIMESTAMPTZ NOT NULL,
+
+  status subscriptions_status NOT NULL, 
+
+  is_offer_applied BOOLEAN DEFAULT false,
+  
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_subscriptions_business_id ON subscriptions(business_id);
+CREATE INDEX idx_subscriptions_status ON subscriptions(status);
+CREATE INDEX idx_subscriptions_rzp_id ON subscriptions(razorpay_subscription_id);
+
+CREATE TYPE subscription_invoices_status AS ENUM (
+    'pending', 'paid', 'failed', 'refunded'
+);
+
+CREATE TABLE subscription_invoices (
+  id UUID PRIMARY key DEFAULT gen_random_uuid(),
+  subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE SET NULL,
+  business_id UUID NOT NULL REFERENCES businesses(id) ON DELETE CASCADE,
+
+  razorpay_payment_id TEXT NOT NULL UNIQUE,
+  amount_paid BIGINT NOT NULL, 
+  currency TEXT DEFAULT 'INR',
+
+  status subscription_invoices_status NOT NULL,
+  
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_invoices_business_id ON subscription_invoices(business_id);
+
+CREATE TYPE marketer_payouts_method AS ENUM ('UPI', 'NEFT', 'CASH');
+
+CREATE TABLE marketer_payouts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    marketer_id UUID NOT NULL REFERENCES marketers(id) ON DELETE CASCADE,
+    
+    amount BIGINT NOT NULL,      
+    payment_method TEXT NOT NULL, 
+    transaction_reference TEXT NOT NULL,   
+    
+    paid_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_payouts_marketer_id ON marketer_payouts(marketer_id);
+
+
+ALTER TABLE businesses 
+ADD COLUMN current_plan_id TEXT REFERENCES plans(id) DEFAULT NULL,
+ADD COLUMN subscriptions_status subscriptions_status DEFAULT 'inactive',
+ADD COLUMN subscription_end_date TIMESTAMPTZ,
+ADD COLUMN is_trial_used BOOLEAN DEFAULT false;
 
 --- funcitons ---
 
