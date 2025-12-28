@@ -265,7 +265,7 @@ func (h *Handler) getOrCreatePlan(w http.ResponseWriter, r *http.Request, body r
 			// ********************************************************************************************************
 			// create a razorpay plan first
 			name := fmt.Sprintf("%v with %v additional members", body.BasePlan, body.AddOn)
-			description := fmt.Sprintf("%s %s Plan with %d additional users.", cases.Title(language.English).String(body.Period), cases.Title(language.English).String(body.BasePlan), body.AddOn)
+			description := fmt.Sprintf("%s %s Plan with %s additional users.", cases.Title(language.English).String(body.Period), cases.Title(language.English).String(body.BasePlan), body.AddOn)
 			// Output: "Monthly Retail Plan with 5 additional users."
 
 			newPlanData := map[string]any{

@@ -114,8 +114,6 @@ func (s *Server) setupRouter() {
 		// ws route to log
 		r.Get("/admin/logs", admin.Hub.HandleLogs)
 
-		r.Get("/api/v1/plans", s.GetPlansHandler)
-
 		r.Mount("/api/v1/users/", userHandler.Routes())
 		r.Mount("/api/v1/business/", businessHandler.Routes())
 		r.Mount("/api/v1/business/{id}/transactions", transactionsHandler.Routes())

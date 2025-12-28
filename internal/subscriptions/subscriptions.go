@@ -46,6 +46,7 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(h.GetRole)
 	r.Post("/create", h.CreateHandler)
+	r.Get("/plans", h.GetPlansHandler)
 	return r
 }
 
