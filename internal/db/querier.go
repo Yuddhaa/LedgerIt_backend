@@ -26,6 +26,10 @@ type Querier interface {
 	CreateEditRequest(ctx context.Context, arg CreateEditRequestParams) (TransactionEditRequest, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
+	// CreatePlan adds a new plan to plans table
+	CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error)
+	// CreateSubscription creates new row in subscriptions table
+	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
 	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
 	// used to delete a business
 	DeleteBusiness(ctx context.Context, id pgtype.UUID) error
@@ -59,6 +63,8 @@ type Querier interface {
 	GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error)
 	// get a particular party
 	GetParty(ctx context.Context, arg GetPartyParams) (Party, error)
+	// GetPlan query gets plan based on the planId
+	GetPlan(ctx context.Context, id string) (Plan, error)
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
@@ -96,6 +102,8 @@ type Querier interface {
 	UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error)
 	// used to update balance in transactions
 	UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error
+	// UpdateBusinessSubscription updates subscriptions related columns
+	UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) error
 	// update a particular category
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party

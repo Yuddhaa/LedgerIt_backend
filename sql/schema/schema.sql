@@ -159,7 +159,7 @@ CREATE INDEX idx_deposits_status ON deposits(status);
 
 -- subscription related
 
-CREATE TYPE plans_period AS ENUM ('month','year','permanent');
+CREATE TYPE plans_period AS ENUM ('monthly','yearly','permanent');
 
 CREATE TABLE plans (
   id TEXT PRIMARY KEY,
@@ -197,7 +197,8 @@ CREATE TABLE marketers (
 );
 
 
-CREATE TYPE subscriptions_status AS ENUM ( 'inactive', 'created', 'trialing', 'active', 
+-- pending|trialing -> active
+CREATE TYPE subscriptions_status AS ENUM ( 'inactive', 'pending', 'trialing','trialing_pending', 'active', 
     'past_due', 'paused', 'canceled', 'expired'
 );
 
@@ -208,13 +209,13 @@ CREATE TABLE subscriptions (
 
   marketer_id UUID REFERENCES marketers(id) ON DELETE SET NULL,
 
-  razorpay_subscription_id TEXT UNIQUE,
-  current_period_start TIMESTAMPTZ NOT NULL,
-  current_period_end TIMESTAMPTZ NOT NULL,
+  razorpay_subscription_id TEXT UNIQUE NOT NULL,
+  current_period_start TIMESTAMPTZ,
+  current_period_end TIMESTAMPTZ,
 
   status subscriptions_status NOT NULL, 
 
-  is_offer_applied BOOLEAN DEFAULT false,
+  is_offer_applied BOOLEAN NOT NULL DEFAULT false,
   
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()

@@ -14,7 +14,7 @@ import (
 const checkUserPlanEligibility = `-- name: CheckUserPlanEligibility :one
 SELECT 
     -- Logic: If count of 'free' plans is 0, then Free IS available.
-    (COUNT(*) FILTER (WHERE current_plan_id = 'free') = 0)::BOOLEAN AS free_available,
+    (COUNT(*) FILTER (WHERE current_plan_id = 'permanent-solo-0') = 0)::BOOLEAN AS free_available,
     
     -- Logic: If count of businesses that used a trial is 0, then Trial IS available.
     (COUNT(*) FILTER (WHERE is_trial_used = true) = 0)::BOOLEAN AS trial_available
@@ -33,6 +33,121 @@ func (q *Queries) CheckUserPlanEligibility(ctx context.Context, ownerID pgtype.U
 	row := q.db.QueryRow(ctx, checkUserPlanEligibility, ownerID)
 	var i CheckUserPlanEligibilityRow
 	err := row.Scan(&i.FreeAvailable, &i.TrialAvailable)
+	return i, err
+}
+
+const createPlan = `-- name: CreatePlan :one
+INSERT INTO plans (
+  id,
+  razorpay_plan_id,
+  name,
+  description,
+  amount,
+  currency,
+  user_limit,
+  period,
+  active
+) VALUES (
+  $1,
+  $2,
+  $3,
+  $4,
+  $5,
+  $6,
+  $7,
+  $8,
+  $9
+)
+RETURNING id, razorpay_plan_id, name, description, amount, currency, user_limit, period, active, created_at
+`
+
+type CreatePlanParams struct {
+	ID             string      `json:"id"`
+	RazorpayPlanID string      `json:"razorpay_plan_id"`
+	Name           string      `json:"name"`
+	Description    pgtype.Text `json:"description"`
+	Amount         int64       `json:"amount"`
+	Currency       string      `json:"currency"`
+	UserLimit      int32       `json:"user_limit"`
+	Period         PlansPeriod `json:"period"`
+	Active         pgtype.Bool `json:"active"`
+}
+
+// CreatePlan adds a new plan to plans table
+func (q *Queries) CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error) {
+	row := q.db.QueryRow(ctx, createPlan,
+		arg.ID,
+		arg.RazorpayPlanID,
+		arg.Name,
+		arg.Description,
+		arg.Amount,
+		arg.Currency,
+		arg.UserLimit,
+		arg.Period,
+		arg.Active,
+	)
+	var i Plan
+	err := row.Scan(
+		&i.ID,
+		&i.RazorpayPlanID,
+		&i.Name,
+		&i.Description,
+		&i.Amount,
+		&i.Currency,
+		&i.UserLimit,
+		&i.Period,
+		&i.Active,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const createSubscription = `-- name: CreateSubscription :one
+INSERT INTO subscriptions (
+    business_id,
+    plan_id,
+    razorpay_subscription_id,
+    status,
+    marketer_id,
+    is_offer_applied
+) VALUES (
+    $1, $2, $3,$4, $5, $6
+) RETURNING id, business_id, plan_id, marketer_id, razorpay_subscription_id, current_period_start, current_period_end, status, is_offer_applied, created_at, updated_at
+`
+
+type CreateSubscriptionParams struct {
+	BusinessID             pgtype.UUID         `json:"business_id"`
+	PlanID                 string              `json:"plan_id"`
+	RazorpaySubscriptionID string              `json:"razorpay_subscription_id"`
+	Status                 SubscriptionsStatus `json:"status"`
+	MarketerID             pgtype.UUID         `json:"marketer_id"`
+	IsOfferApplied         bool                `json:"is_offer_applied"`
+}
+
+// CreateSubscription creates new row in subscriptions table
+func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error) {
+	row := q.db.QueryRow(ctx, createSubscription,
+		arg.BusinessID,
+		arg.PlanID,
+		arg.RazorpaySubscriptionID,
+		arg.Status,
+		arg.MarketerID,
+		arg.IsOfferApplied,
+	)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.BusinessID,
+		&i.PlanID,
+		&i.MarketerID,
+		&i.RazorpaySubscriptionID,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.Status,
+		&i.IsOfferApplied,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
 	return i, err
 }
 
@@ -78,4 +193,59 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 		&i.MembersCount,
 	)
 	return i, err
+}
+
+const getPlan = `-- name: GetPlan :one
+SELECT id, razorpay_plan_id, name, description, amount, currency, user_limit, period, active, created_at FROM plans WHERE id = $1
+`
+
+// GetPlan query gets plan based on the planId
+func (q *Queries) GetPlan(ctx context.Context, id string) (Plan, error) {
+	row := q.db.QueryRow(ctx, getPlan, id)
+	var i Plan
+	err := row.Scan(
+		&i.ID,
+		&i.RazorpayPlanID,
+		&i.Name,
+		&i.Description,
+		&i.Amount,
+		&i.Currency,
+		&i.UserLimit,
+		&i.Period,
+		&i.Active,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const updateBusinessSubscription = `-- name: UpdateBusinessSubscription :exec
+UPDATE businesses
+SET 
+    current_plan_id = $2,
+    subscriptions_status = $3,
+    subscription_end_date = $4,
+    -- If $5 is NULL, it keeps the existing 'is_trial_used' value
+    is_trial_used = COALESCE($5, is_trial_used),
+    updated_at = now()
+WHERE id = $1
+`
+
+type UpdateBusinessSubscriptionParams struct {
+	ID                  pgtype.UUID             `json:"id"`
+	CurrentPlanID       pgtype.Text             `json:"current_plan_id"`
+	SubscriptionsStatus NullSubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndDate pgtype.Timestamptz      `json:"subscription_end_date"`
+	IsTrialUsed         pgtype.Bool             `json:"is_trial_used"`
+}
+
+// UpdateBusinessSubscription updates subscriptions related columns
+func (q *Queries) UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) error {
+	_, err := q.db.Exec(ctx, updateBusinessSubscription,
+		arg.ID,
+		arg.CurrentPlanID,
+		arg.SubscriptionsStatus,
+		arg.SubscriptionEndDate,
+		arg.IsTrialUsed,
+	)
+	return err
 }

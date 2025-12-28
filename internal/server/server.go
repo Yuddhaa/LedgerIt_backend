@@ -83,7 +83,11 @@ func (s *Server) setupRouter() {
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
 	partiesHandler := parties.NewHandler(s.db, s.pool)
 	categoriesHandler := categories.NewHandler(s.db, s.pool)
-	subscriptionsHandler := subscriptions.NewHandler(s.db, s.pool)
+	subscriptionsHandler, err := subscriptions.NewHandler(s.db, s.pool)
+	if err != nil {
+		helpers.LogError("setupRouter", "error in intialising subscriptionsHandler", "err", err.Error())
+		os.Exit(1)
+	}
 
 	// for transactionshandler
 	dbStore := db.NewDBStore(s.pool)

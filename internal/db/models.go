@@ -186,8 +186,8 @@ func (ns NullMarketerPayoutsMethod) Value() (driver.Value, error) {
 type PlansPeriod string
 
 const (
-	PlansPeriodMonth     PlansPeriod = "month"
-	PlansPeriodYear      PlansPeriod = "year"
+	PlansPeriodMonthly   PlansPeriod = "monthly"
+	PlansPeriodYearly    PlansPeriod = "yearly"
 	PlansPeriodPermanent PlansPeriod = "permanent"
 )
 
@@ -273,14 +273,15 @@ func (ns NullSubscriptionInvoicesStatus) Value() (driver.Value, error) {
 type SubscriptionsStatus string
 
 const (
-	SubscriptionsStatusInactive SubscriptionsStatus = "inactive"
-	SubscriptionsStatusCreated  SubscriptionsStatus = "created"
-	SubscriptionsStatusTrialing SubscriptionsStatus = "trialing"
-	SubscriptionsStatusActive   SubscriptionsStatus = "active"
-	SubscriptionsStatusPastDue  SubscriptionsStatus = "past_due"
-	SubscriptionsStatusPaused   SubscriptionsStatus = "paused"
-	SubscriptionsStatusCanceled SubscriptionsStatus = "canceled"
-	SubscriptionsStatusExpired  SubscriptionsStatus = "expired"
+	SubscriptionsStatusInactive        SubscriptionsStatus = "inactive"
+	SubscriptionsStatusPending         SubscriptionsStatus = "pending"
+	SubscriptionsStatusTrialing        SubscriptionsStatus = "trialing"
+	SubscriptionsStatusTrialingPending SubscriptionsStatus = "trialing_pending"
+	SubscriptionsStatusActive          SubscriptionsStatus = "active"
+	SubscriptionsStatusPastDue         SubscriptionsStatus = "past_due"
+	SubscriptionsStatusPaused          SubscriptionsStatus = "paused"
+	SubscriptionsStatusCanceled        SubscriptionsStatus = "canceled"
+	SubscriptionsStatusExpired         SubscriptionsStatus = "expired"
 )
 
 func (e *SubscriptionsStatus) Scan(src interface{}) error {
@@ -540,11 +541,11 @@ type Subscription struct {
 	BusinessID             pgtype.UUID         `json:"business_id"`
 	PlanID                 string              `json:"plan_id"`
 	MarketerID             pgtype.UUID         `json:"marketer_id"`
-	RazorpaySubscriptionID pgtype.Text         `json:"razorpay_subscription_id"`
+	RazorpaySubscriptionID string              `json:"razorpay_subscription_id"`
 	CurrentPeriodStart     pgtype.Timestamptz  `json:"current_period_start"`
 	CurrentPeriodEnd       pgtype.Timestamptz  `json:"current_period_end"`
 	Status                 SubscriptionsStatus `json:"status"`
-	IsOfferApplied         pgtype.Bool         `json:"is_offer_applied"`
+	IsOfferApplied         bool                `json:"is_offer_applied"`
 	CreatedAt              pgtype.Timestamptz  `json:"created_at"`
 	UpdatedAt              pgtype.Timestamptz  `json:"updated_at"`
 }
