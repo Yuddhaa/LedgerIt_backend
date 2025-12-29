@@ -15,6 +15,7 @@ import (
 	"LedgerIt/internal/subscriptions"
 	"LedgerIt/internal/transactions"
 	"LedgerIt/internal/users"
+	"LedgerIt/internal/webhooks"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -88,6 +89,11 @@ func (s *Server) setupRouter() {
 		helpers.LogError("setupRouter", "error in intialising subscriptionsHandler", "err", err.Error())
 		os.Exit(1)
 	}
+	webhooksHandler, err := webhooks.NewHandler(s.db, s.pool)
+	if err != nil {
+		helpers.LogError("setupRouter", "error in intialising webhooksHandler", "err", err.Error())
+		os.Exit(1)
+	}
 
 	// for transactionshandler
 	dbStore := db.NewDBStore(s.pool)
@@ -100,6 +106,7 @@ func (s *Server) setupRouter() {
 	})
 
 	r.Mount("/api/v1/auth/", authHandler.Routes())
+	r.Mount("/api/v1/webhooks", webhooksHandler.Routes())
 
 	// --- Protected Routes (under JWT Auth) ---
 	r.Group(func(r chi.Router) {
