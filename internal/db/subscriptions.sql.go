@@ -158,7 +158,7 @@ SELECT
     p.amount,
     p.currency,
     b.subscriptions_status,
-    b.subscription_end_date,
+    b.subscription_end_period,
     
     -- Fetch directly from the joined subscription table
     s.id AS subscription_id,
@@ -181,7 +181,7 @@ type GetBusinessCurrentPlanRow struct {
 	Amount                 pgtype.Int8             `json:"amount"`
 	Currency               pgtype.Text             `json:"currency"`
 	SubscriptionsStatus    NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndDate    pgtype.Timestamptz      `json:"subscription_end_date"`
+	SubscriptionEndPeriod  pgtype.Timestamptz      `json:"subscription_end_period"`
 	SubscriptionID         pgtype.UUID             `json:"subscription_id"`
 	RazorpaySubscriptionID pgtype.Text             `json:"razorpay_subscription_id"`
 	MembersCount           int32                   `json:"members_count"`
@@ -197,7 +197,7 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 		&i.Amount,
 		&i.Currency,
 		&i.SubscriptionsStatus,
-		&i.SubscriptionEndDate,
+		&i.SubscriptionEndPeriod,
 		&i.SubscriptionID,
 		&i.RazorpaySubscriptionID,
 		&i.MembersCount,
@@ -233,19 +233,23 @@ UPDATE businesses
 SET 
     current_plan_id = $2,
     subscriptions_status = $3,
-    subscription_end_date = $4,
+    subscription_end_period = $4,
     -- If $5 is NULL, it keeps the existing 'is_trial_used' value
     is_trial_used = COALESCE($5, is_trial_used),
+    is_offer_used = COALESCE($6,is_offer_used),
+    current_subscription_id = $7,
     updated_at = now()
 WHERE id = $1
 `
 
 type UpdateBusinessSubscriptionParams struct {
-	ID                  pgtype.UUID             `json:"id"`
-	CurrentPlanID       pgtype.Text             `json:"current_plan_id"`
-	SubscriptionsStatus NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndDate pgtype.Timestamptz      `json:"subscription_end_date"`
-	IsTrialUsed         pgtype.Bool             `json:"is_trial_used"`
+	ID                    pgtype.UUID             `json:"id"`
+	CurrentPlanID         pgtype.Text             `json:"current_plan_id"`
+	SubscriptionsStatus   NullSubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndPeriod pgtype.Timestamptz      `json:"subscription_end_period"`
+	IsTrialUsed           pgtype.Bool             `json:"is_trial_used"`
+	IsOfferUsed           pgtype.Bool             `json:"is_offer_used"`
+	CurrentSubscriptionID pgtype.UUID             `json:"current_subscription_id"`
 }
 
 // UpdateBusinessSubscription updates subscriptions related columns
@@ -254,8 +258,10 @@ func (q *Queries) UpdateBusinessSubscription(ctx context.Context, arg UpdateBusi
 		arg.ID,
 		arg.CurrentPlanID,
 		arg.SubscriptionsStatus,
-		arg.SubscriptionEndDate,
+		arg.SubscriptionEndPeriod,
 		arg.IsTrialUsed,
+		arg.IsOfferUsed,
+		arg.CurrentSubscriptionID,
 	)
 	return err
 }

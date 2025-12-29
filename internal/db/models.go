@@ -454,7 +454,7 @@ type Business struct {
 	UpdatedAt             pgtype.Timestamptz      `json:"updated_at"`
 	CurrentPlanID         pgtype.Text             `json:"current_plan_id"`
 	SubscriptionsStatus   NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndDate   pgtype.Timestamptz      `json:"subscription_end_date"`
+	SubscriptionEndPeriod pgtype.Timestamptz      `json:"subscription_end_period"`
 	IsTrialUsed           pgtype.Bool             `json:"is_trial_used"`
 	CurrentSubscriptionID pgtype.UUID             `json:"current_subscription_id"`
 	IsOfferUsed           pgtype.Bool             `json:"is_offer_used"`

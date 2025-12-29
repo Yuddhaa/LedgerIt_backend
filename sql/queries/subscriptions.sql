@@ -18,7 +18,7 @@ SELECT
     p.amount,
     p.currency,
     b.subscriptions_status,
-    b.subscription_end_date,
+    b.subscription_end_period,
     
     -- Fetch directly from the joined subscription table
     s.id AS subscription_id,
@@ -83,8 +83,10 @@ UPDATE businesses
 SET 
     current_plan_id = $2,
     subscriptions_status = $3,
-    subscription_end_date = $4,
+    subscription_end_period = $4,
     -- If $5 is NULL, it keeps the existing 'is_trial_used' value
     is_trial_used = COALESCE($5, is_trial_used),
+    is_offer_used = COALESCE($6,is_offer_used),
+    current_subscription_id = $7,
     updated_at = now()
 WHERE id = $1;

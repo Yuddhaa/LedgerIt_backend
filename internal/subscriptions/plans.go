@@ -26,7 +26,7 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 		Name                   *string `json:"name"`
 		Amount                 *int64  `json:"amount"`
 		Currency               *string `json:"currency"`
-		SubscriptionEndDate    any     `json:"subscription_end_date"`
+		SubscriptionEndPeriod  any     `json:"subscription_end_period"`
 		SubscriptionID         *string `json:"subscription_id"`
 		RazorpaySubscriptionID *string `json:"razorpay_subscription_id"`
 	}
@@ -64,6 +64,7 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			helpers.RespondWithError(w, http.StatusNotFound, "Business not found")
+			helpers.LogInfo("GetPlansHandler", "Business not found", "businessId", businessId)
 			return
 		}
 		helpers.RespondWithError(w, 500, "internal server error")
@@ -122,7 +123,7 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 			Name:                   &dbPlan.PlanName.String,
 			Amount:                 &dbPlan.Amount.Int64,
 			Currency:               &dbPlan.Currency.String,
-			SubscriptionEndDate:    dbPlan.SubscriptionEndDate, // pgtype handles JSON marshaling well
+			SubscriptionEndPeriod:  dbPlan.SubscriptionEndPeriod, // pgtype handles JSON marshaling well
 			SubscriptionID:         subIDStr,
 			RazorpaySubscriptionID: rzpSubIDStr,
 		}
