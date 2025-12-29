@@ -80,31 +80,6 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if body.BasePlan == "solo" {
-			// Cancel immediately at Razorpay
-			if curPlan.RazorpaySubscriptionID.Valid && curPlan.RazorpaySubscriptionID.String != "" {
-				rzpID := curPlan.RazorpaySubscriptionID.String
-
-				// "cancel_at_cycle_end": 0 means "kill it now"
-				_, err := h.rp_client.Subscription.Cancel(rzpID, map[string]any{"cancel_at_cycle_end": 0}, nil)
-				if err != nil {
-					// 3. SMART ERROR HANDLING
-
-					// Case A: If it's already cancelled (or doesn't exist), we can proceed safely.
-					// Razorpay error messages usually contain "BAD_REQUEST_ERROR" or descriptions like "Subscription is not in active state"
-					if strings.Contains(err.Error(), "BAD_REQUEST_ERROR") || strings.Contains(err.Error(), "not in active state") {
-						helpers.LogInfo("UpdateHandler", "Subscription was already inactive, proceeding to downgrade", "subID", rzpID)
-					} else {
-						// Case B: Network/Server error (The Dangerous Ones)
-						// STOP HERE. Do not update DB.
-						helpers.LogError("UpdateHandler", "Failed to cancel Razorpay sub - Aborting Downgrade",
-							"subID", rzpID, "err", err.Error())
-						helpers.RespondWithError(w, http.StatusBadGateway, "Failed to cancel subscription with bank. Please try again.")
-						return
-					}
-				} else {
-					helpers.LogInfo("UpdateHandler", "Old subscription cancelled for downgrade", "subID", rzpID)
-				}
-			}
 			// update db to solo plan
 			h.handleSoloPlan(w, r, body, userId, businessId, true, curPlan)
 			return
