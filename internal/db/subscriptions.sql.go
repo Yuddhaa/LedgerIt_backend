@@ -159,6 +159,11 @@ SELECT
     p.currency,
     b.subscriptions_status,
     b.subscription_end_date,
+    
+    -- Fetch directly from the joined subscription table
+    s.id AS subscription_id,
+    s.razorpay_subscription_id,
+    
     (
         SELECT COUNT(*)::INT 
         FROM business_members bm 
@@ -166,17 +171,20 @@ SELECT
     ) AS members_count
 FROM businesses b
 LEFT JOIN plans p ON b.current_plan_id = p.id
+LEFT JOIN subscriptions s ON b.current_subscription_id = s.id
 WHERE b.id = $1
 `
 
 type GetBusinessCurrentPlanRow struct {
-	CurrentPlanID       pgtype.Text             `json:"current_plan_id"`
-	PlanName            pgtype.Text             `json:"plan_name"`
-	Amount              pgtype.Int8             `json:"amount"`
-	Currency            pgtype.Text             `json:"currency"`
-	SubscriptionsStatus NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndDate pgtype.Timestamptz      `json:"subscription_end_date"`
-	MembersCount        int32                   `json:"members_count"`
+	CurrentPlanID          pgtype.Text             `json:"current_plan_id"`
+	PlanName               pgtype.Text             `json:"plan_name"`
+	Amount                 pgtype.Int8             `json:"amount"`
+	Currency               pgtype.Text             `json:"currency"`
+	SubscriptionsStatus    NullSubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndDate    pgtype.Timestamptz      `json:"subscription_end_date"`
+	SubscriptionID         pgtype.UUID             `json:"subscription_id"`
+	RazorpaySubscriptionID pgtype.Text             `json:"razorpay_subscription_id"`
+	MembersCount           int32                   `json:"members_count"`
 }
 
 // GetBusinessCurrentPlan gets the details on the current plan
@@ -190,6 +198,8 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 		&i.Currency,
 		&i.SubscriptionsStatus,
 		&i.SubscriptionEndDate,
+		&i.SubscriptionID,
+		&i.RazorpaySubscriptionID,
 		&i.MembersCount,
 	)
 	return i, err

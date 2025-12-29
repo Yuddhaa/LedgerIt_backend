@@ -447,15 +447,17 @@ func (ns NullTransactionMode) Value() (driver.Value, error) {
 }
 
 type Business struct {
-	ID                  pgtype.UUID             `json:"id"`
-	Name                string                  `json:"name"`
-	OwnerID             pgtype.UUID             `json:"owner_id"`
-	CreatedAt           pgtype.Timestamptz      `json:"created_at"`
-	UpdatedAt           pgtype.Timestamptz      `json:"updated_at"`
-	CurrentPlanID       pgtype.Text             `json:"current_plan_id"`
-	SubscriptionsStatus NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndDate pgtype.Timestamptz      `json:"subscription_end_date"`
-	IsTrialUsed         pgtype.Bool             `json:"is_trial_used"`
+	ID                    pgtype.UUID             `json:"id"`
+	Name                  string                  `json:"name"`
+	OwnerID               pgtype.UUID             `json:"owner_id"`
+	CreatedAt             pgtype.Timestamptz      `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz      `json:"updated_at"`
+	CurrentPlanID         pgtype.Text             `json:"current_plan_id"`
+	SubscriptionsStatus   NullSubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndDate   pgtype.Timestamptz      `json:"subscription_end_date"`
+	IsTrialUsed           pgtype.Bool             `json:"is_trial_used"`
+	CurrentSubscriptionID pgtype.UUID             `json:"current_subscription_id"`
+	IsOfferUsed           pgtype.Bool             `json:"is_offer_used"`
 }
 
 type BusinessMember struct {

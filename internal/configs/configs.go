@@ -11,6 +11,7 @@ const (
 
 // PlanStruct is type for individual plan information
 type PlanStruct struct {
+	Level            int `json:"level"`
 	MonthlyBasePrice int `json:"monthly_base_price"`
 	YearlyBasePrice  int `json:"yearly_base_price"`
 	UsersLimit       int `json:"users_limit"`
@@ -18,8 +19,8 @@ type PlanStruct struct {
 
 // Plans gives details on each individual base plan
 var Plans = map[string]PlanStruct{
-	"solo":       {MonthlyBasePrice: 0, YearlyBasePrice: 0, UsersLimit: 1},
-	"retail":     {MonthlyBasePrice: 14900, YearlyBasePrice: 118800, UsersLimit: 3},
-	"wholesale":  {MonthlyBasePrice: 47900, YearlyBasePrice: 388800, UsersLimit: 8},
-	"enterprice": {MonthlyBasePrice: 97400, YearlyBasePrice: 838800, UsersLimit: 15},
+	"solo":       {Level: 1, MonthlyBasePrice: 0, YearlyBasePrice: 0, UsersLimit: 1},
+	"retail":     {Level: 2, MonthlyBasePrice: 14900, YearlyBasePrice: 118800, UsersLimit: 3},
+	"wholesale":  {Level: 3, MonthlyBasePrice: 47900, YearlyBasePrice: 388800, UsersLimit: 8},
+	"enterprice": {Level: 4, MonthlyBasePrice: 97400, YearlyBasePrice: 838800, UsersLimit: 15},
 }

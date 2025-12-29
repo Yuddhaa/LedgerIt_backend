@@ -263,7 +263,9 @@ ALTER TABLE businesses
 ADD COLUMN current_plan_id TEXT REFERENCES plans(id) DEFAULT NULL,
 ADD COLUMN subscriptions_status subscriptions_status DEFAULT 'inactive',
 ADD COLUMN subscription_end_date TIMESTAMPTZ,
-ADD COLUMN is_trial_used BOOLEAN DEFAULT false;
+ADD COLUMN is_trial_used BOOLEAN DEFAULT false,
+ADD COLUMN current_subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
+ADD COLUMN is_offer_used BOOLEAN DEFAULT false;
 
 --- funcitons ---
 

@@ -19,6 +19,11 @@ SELECT
     p.currency,
     b.subscriptions_status,
     b.subscription_end_date,
+    
+    -- Fetch directly from the joined subscription table
+    s.id AS subscription_id,
+    s.razorpay_subscription_id,
+    
     (
         SELECT COUNT(*)::INT 
         FROM business_members bm 
@@ -26,6 +31,7 @@ SELECT
     ) AS members_count
 FROM businesses b
 LEFT JOIN plans p ON b.current_plan_id = p.id
+LEFT JOIN subscriptions s ON b.current_subscription_id = s.id
 WHERE b.id = $1;
 
 -- GetPlan query gets plan based on the planId
