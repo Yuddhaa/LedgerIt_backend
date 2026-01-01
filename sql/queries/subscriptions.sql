@@ -90,3 +90,101 @@ SET
     current_subscription_id = $7,
     updated_at = now()
 WHERE id = $1;
+
+-- Create the missing Invoice Query (we need this for the charged event)
+-- name: CreateInvoice :one
+INSERT INTO subscription_invoices (
+  subscription_id, business_id, razorpay_payment_id, amount_paid, currency, status
+) VALUES (
+  $1, $2, $3, $4, $5, $6
+) RETURNING id;
+
+-- Query to find subscription by Razorpay ID (Critical for Webhooks)
+-- name: GetSubscriptionByRazorpayID :one
+SELECT * FROM subscriptions WHERE razorpay_subscription_id = $1 LIMIT 1;
+
+-- name: UpdateSubscriptionAndBusiness :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = $2,
+        current_period_start = $3,
+        current_period_end = $4,
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+    RETURNING id, business_id, status, current_period_end, plan_id
+)
+UPDATE businesses
+SET 
+    current_plan_id = updated_sub.plan_id,
+    subscriptions_status = updated_sub.status,
+    subscription_end_period = updated_sub.current_period_end,
+    current_subscription_id = updated_sub.id,
+-- If 'is_trial_used' is already true, keep it true.
+    -- If $5 input is true, make it true.
+    -- Only if BOTH are false does it stay false.
+    is_trial_used = (is_trial_used OR COALESCE(sqlc.narg('is_trial_used')::boolean, false))
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id;
+
+-- name: UpdateStatusIfPending :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = $2,
+        -- Use sqlc.narg to handle optional End Date updates (for Trials)
+        current_period_end = COALESCE(sqlc.narg('current_period_end')::TIMESTAMPTZ, current_period_end),
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+      -- ✅ ATOMIC GUARD: Only allow update if we are in "start" states
+      AND status::text IN ('inactive', 'pending', 'trialing_pending', 'authenticated')
+    RETURNING id, business_id, status, current_period_end,plan_id
+)
+UPDATE businesses
+SET 
+    subscriptions_status = updated_sub.status,
+    subscription_end_period = updated_sub.current_period_end,
+    current_plan_id = updated_sub.plan_id,
+    current_subscription_id = updated_sub.id,
+    is_trial_used = (is_trial_used OR COALESCE(sqlc.narg('is_trial_used')::boolean, false))
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id;
+
+-- name: UpdateSubscriptionStatusRaw :exec
+-- Used for simple state changes like Paused, Resumed, Pending, Halted
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = $2,
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+    RETURNING id, business_id, status
+)
+UPDATE businesses
+SET 
+    subscriptions_status = updated_sub.status
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id;
+
+-- name: CancelSubscription :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = 'canceled',
+        current_period_end = now(), -- Cut off access immediately (or keep date if you prefer)
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+    RETURNING id, business_id
+)
+UPDATE businesses
+SET 
+    subscriptions_status = 'canceled',
+    current_subscription_id = NULL -- Unlink the cancelled sub
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id
+  -- 🛑 SAFETY: Only cancel business status if this was the CURRENT active subscription
+  AND businesses.current_subscription_id = updated_sub.id;
+
+-- name: GetSubscriptionStatus :one
+SELECT status FROM subscriptions WHERE business_id = $1 AND id = $2;
+

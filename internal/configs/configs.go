@@ -1,12 +1,32 @@
 package configs
 
-import "time"
+import (
+	"fmt"
+	"os"
+	"time"
+
+	"LedgerIt/internal/helpers"
+)
+
+type configType struct {
+	PORT                 string
+	DBURL                string
+	JWT_SECRET           string
+	GOOGLE_WEB_CLIENT_ID string
+	GOOGLE_ANDROID_ID    string
+	GOOGLE_IOS_ID        string
+	RAZORPAY_API_KEY     string
+	RAZORPAY_API_SECRET  string
+}
+
+var Configs configType
 
 const (
 	MONTHLY_ADDON = 7900
 	YEARLY_ADDON  = 70800
-	TRIAL_DAYS    = time.Duration(90 * 24 * time.Hour)
-	FREE_PLAN_ID  = "permanent-solo-0"
+	// TRIAL_DAYS    = time.Duration(90 * 24 * time.Hour)
+	TRIAL_DAYS   = time.Duration(time.Hour * 10)
+	FREE_PLAN_ID = "permanent-solo-0"
 )
 
 // PlanStruct is type for individual plan information
@@ -23,4 +43,66 @@ var Plans = map[string]PlanStruct{
 	"retail":     {Level: 2, MonthlyBasePrice: 14900, YearlyBasePrice: 118800, UsersLimit: 3},
 	"wholesale":  {Level: 3, MonthlyBasePrice: 47900, YearlyBasePrice: 388800, UsersLimit: 8},
 	"enterprice": {Level: 4, MonthlyBasePrice: 97400, YearlyBasePrice: 838800, UsersLimit: 15},
+}
+
+func LoadConfig() error {
+	port := os.Getenv("PORT")
+	if port == "" {
+		helpers.LogError("loadConfig", "port is not set in environment")
+		return fmt.Errorf("RAZORPAY_API_KEY is not set in environment")
+	}
+
+	dburl := os.Getenv("DBURL")
+	if dburl == "" {
+		helpers.LogError("loadConfig", "DBURL is not set in environment")
+		return fmt.Errorf("DBURL is not set in environment")
+	}
+
+	razorpayKey := os.Getenv("RAZORPAY_API_KEY")
+	if razorpayKey == "" {
+		helpers.LogError("loadConfig", "RAZORPAY_API_KEY is not set in environment")
+		return fmt.Errorf("RAZORPAY_API_KEY is not set in environment")
+	}
+
+	razorpaySecret := os.Getenv("RAZORPAY_API_SECRET")
+	if razorpaySecret == "" {
+		helpers.LogError("loadConfig", "RAZORPAY_API_SECRET is not set in environment")
+		return fmt.Errorf("RAZORPAY_API_SECRET is not set in environment")
+	}
+
+	googleClientID := os.Getenv("GOOGLE_WEB_CLIENT_ID")
+	if googleClientID == "" {
+		helpers.LogError("auth.NewHandler", "GOOGLE_WEB_CLIENT_ID is not set in environment")
+		return fmt.Errorf("GOOGLE_WEB_CLIENT_ID is not set")
+	}
+
+	googleAndroidId := os.Getenv("GOOGLE_ANDROID_ID")
+	if googleAndroidId == "" {
+		helpers.LogError("auth.NewHandler", "GOOGLE_ANDROID_ID is not set in environment")
+		return fmt.Errorf("GOOGLE_ANDROID_ID is not set")
+	}
+
+	googleIOSId := os.Getenv("GOOGLE_IOS_ID")
+	if googleIOSId == "" {
+		helpers.LogError("auth.NewHandler", "GOOGLE_IOS_ID is not set in environment")
+		return fmt.Errorf("GOOGLE_IOS_ID is not set")
+	}
+
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		helpers.LogError("auth.NewHandler", "JWT_SECRET is not set in environment")
+		return fmt.Errorf("JWT_SECRET is not set")
+	}
+
+	Configs = configType{
+		PORT:                 port,
+		DBURL:                dburl,
+		RAZORPAY_API_KEY:     razorpayKey,
+		RAZORPAY_API_SECRET:  razorpaySecret,
+		GOOGLE_WEB_CLIENT_ID: googleClientID,
+		GOOGLE_ANDROID_ID:    googleAndroidId,
+		GOOGLE_IOS_ID:        googleIOSId,
+		JWT_SECRET:           jwtSecret,
+	}
+	return nil
 }

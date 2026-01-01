@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
@@ -79,7 +80,7 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)), // 1 hour is good
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-	}, h.jwtSecret)
+	}, configs.Configs.JWT_SECRET)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		helpers.LogError("RefreshHandler", "error in signing the jwt token", "error", err.Error())

@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
+	CancelSubscription(ctx context.Context, razorpaySubscriptionID string) error
 	// returns 1 if a user is admin or creator of a given business_id
 	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
 	// returns 1 if a user is a member of a given business_id
@@ -24,6 +25,8 @@ type Querier interface {
 	// add a new category
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
 	CreateEditRequest(ctx context.Context, arg CreateEditRequestParams) (TransactionEditRequest, error)
+	// Create the missing Invoice Query (we need this for the charged event)
+	CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (pgtype.UUID, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
 	// CreatePlan adds a new plan to plans table
@@ -68,6 +71,9 @@ type Querier interface {
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
+	// Query to find subscription by Razorpay ID (Critical for Webhooks)
+	GetSubscriptionByRazorpayID(ctx context.Context, razorpaySubscriptionID string) (Subscription, error)
+	GetSubscriptionStatus(ctx context.Context, arg GetSubscriptionStatusParams) (SubscriptionsStatus, error)
 	// 1. Joins for REQUESTED changes (from JSON)
 	// 2. NEW: Joins for ORIGINAL transaction (from Columns)
 	GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error)
@@ -108,6 +114,11 @@ type Querier interface {
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
+	UpdateStatusIfPending(ctx context.Context, arg UpdateStatusIfPendingParams) error
+	// If 'is_trial_used' is already true, keep it true.
+	UpdateSubscriptionAndBusiness(ctx context.Context, arg UpdateSubscriptionAndBusinessParams) error
+	// Used for simple state changes like Paused, Resumed, Pending, Halted
+	UpdateSubscriptionStatusRaw(ctx context.Context, arg UpdateSubscriptionStatusRawParams) error
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)

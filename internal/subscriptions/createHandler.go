@@ -49,6 +49,28 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if ok := validateRequestBody(w, body); !ok {
 		return // response is sent in the validateRequestBody
 	}
+
+	// ****************************************************************************************************************
+	// check if a subscription already exists, if so, use /update
+	// ****************************************************************************************************************
+	curPlan, ok := h.getCurrentPlan(w, r.Context(), businessId)
+	if !ok {
+		return
+	}
+	// Logic: If they have a plan ID, and the status implies it's still "alive" (not canceled/expired), block them.
+	if curPlan.CurrentPlanID.Valid {
+		status := curPlan.SubscriptionsStatus.SubscriptionsStatus
+
+		// Check if the subscription is in a state that blocks new creation
+		isActiveOrPaused := status != db.SubscriptionsStatusCanceled && status != db.SubscriptionsStatusExpired
+
+		if isActiveOrPaused {
+			helpers.LogError("CreateHandler", "Business already has an active link", "businessId", businessId, "status", status)
+			// Use 409 Conflict logic
+			helpers.RespondWithError(w, http.StatusConflict, "Subscription already exists. Please use /update to change your plan.")
+			return
+		}
+	}
 	// ****************************************************************************************************************
 	// check if either solo or trial available before moving forward if thats what the user has clicked
 	// ****************************************************************************************************************

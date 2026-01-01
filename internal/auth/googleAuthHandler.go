@@ -6,6 +6,7 @@ import (
 	"slices"
 	"time"
 
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
@@ -48,9 +49,9 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 	// Define all the Client IDs your backend should trust.
 	// ideally, load these from your config/env variables
 	trustedClientIDs := []string{
-		h.googleClientId,  // Your existing Web ID
-		h.googleAndroidId, // Add your Android Client ID here
-		h.googleIOSId,     // Add your iOS Client ID here
+		configs.Configs.GOOGLE_WEB_CLIENT_ID, // Your existing Web ID
+		configs.Configs.GOOGLE_ANDROID_ID,    // Add your Android Client ID here
+		configs.Configs.GOOGLE_IOS_ID,        // Add your iOS Client ID here
 		// If you are using Expo Go, it might have a specific ID too
 	}
 
@@ -157,7 +158,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-	}, h.jwtSecret)
+	}, configs.Configs.JWT_SECRET)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal Server Error")
 		helpers.LogError("GoogleAuthHandler", "error in signing the jwt token", "error", err.Error())

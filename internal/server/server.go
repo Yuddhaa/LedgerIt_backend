@@ -9,6 +9,7 @@ import (
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/business"
 	"LedgerIt/internal/categories"
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/parties"
@@ -21,6 +22,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/razorpay/razorpay-go"
 )
 
 // Server holds all dependencies for the HTTP server.
@@ -84,12 +86,11 @@ func (s *Server) setupRouter() {
 	businessHandler := business.NewHandler(s.db, s.pool, s.logger)
 	partiesHandler := parties.NewHandler(s.db, s.pool)
 	categoriesHandler := categories.NewHandler(s.db, s.pool)
-	subscriptionsHandler, err := subscriptions.NewHandler(s.db, s.pool)
-	if err != nil {
-		helpers.LogError("setupRouter", "error in intialising subscriptionsHandler", "err", err.Error())
-		os.Exit(1)
-	}
-	webhooksHandler, err := webhooks.NewHandler(s.db, s.pool)
+
+	rp_client := razorpay.NewClient(configs.Configs.RAZORPAY_API_KEY, configs.Configs.RAZORPAY_API_SECRET)
+
+	subscriptionsHandler := subscriptions.NewHandler(s.db, s.pool, rp_client)
+	webhooksHandler, err := webhooks.NewHandler(s.db, s.pool, rp_client)
 	if err != nil {
 		helpers.LogError("setupRouter", "error in intialising webhooksHandler", "err", err.Error())
 		os.Exit(1)

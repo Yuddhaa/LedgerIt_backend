@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
@@ -98,7 +99,7 @@ func (h *Handler) LogoutAllHandler(w http.ResponseWriter, r *http.Request) {
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
-	}, h.jwtSecret)
+	}, configs.Configs.JWT_SECRET)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
 		// CHANGED: Use helper for structured logging.

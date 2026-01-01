@@ -282,6 +282,7 @@ const (
 	SubscriptionsStatusPaused          SubscriptionsStatus = "paused"
 	SubscriptionsStatusCanceled        SubscriptionsStatus = "canceled"
 	SubscriptionsStatusExpired         SubscriptionsStatus = "expired"
+	SubscriptionsStatusAuthenticated   SubscriptionsStatus = "authenticated"
 )
 
 func (e *SubscriptionsStatus) Scan(src interface{}) error {

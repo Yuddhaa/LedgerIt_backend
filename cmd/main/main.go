@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"LedgerIt/internal/admin"
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/server"
@@ -22,12 +23,10 @@ import (
 	"github.com/joho/godotenv"
 )
 
-type config struct {
-	port  string
-	dbURL string
-}
-
 func main() {
+	// ****************************************************************************************************************
+	// set up logger
+	// ****************************************************************************************************************
 	// 1. Open the log file
 	logFile, err := os.OpenFile("log.log", os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o666)
 	if err != nil {
@@ -54,20 +53,26 @@ func main() {
 	// 5. Inject the file-only logger into your helpers package
 	helpers.Logger = logger
 
+	// ****************************************************************************************************************
+	// set up environment variables
+	// ****************************************************************************************************************
 	if err := godotenv.Load(); err != nil {
 		helpers.LogInfo("main", "could not load .env file, using environment variables")
 	}
+	if err := configs.LoadConfig(); err != nil {
+		helpers.LogError("main", "error in loading the configs", "err", err.Error())
+		os.Exit(1)
+	}
 
-	cfg := loadConfig()
-
-	// --- DATABASE CONNECTION LOGIC
-
+	// ****************************************************************************************************************
+	// DATABASE CONNECTION LOGIC
+	// ****************************************************************************************************************
 	// 1. Create a context for the connection attempt
 	dbCtx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
 
 	// 2. Parse the config first so we can modify it
-	dbConfig, err := pgxpool.ParseConfig(cfg.dbURL)
+	dbConfig, err := pgxpool.ParseConfig(configs.Configs.DBURL)
 	if err != nil {
 		helpers.LogError("main", "error parsing db config", "error", err.Error())
 		os.Exit(1)
@@ -110,20 +115,22 @@ func main() {
 	// This ensures every query gets its own connection from the pool.
 	dbQueries := db.New(pool)
 
-	// --- END DATABASE LOGIC ---
+	// ****************************************************************************************************************
+	// server setting up
+	// ****************************************************************************************************************
 
 	// new server object
 	// Pass dbQueries (backed by pool) and the pool itself
 	srvr := server.NewServer(dbQueries, pool, logger)
 
 	httpServer := &http.Server{
-		Addr:    fmt.Sprintf(":%v", cfg.port),
+		Addr:    fmt.Sprintf(":%v", configs.Configs.PORT),
 		Handler: srvr.Router,
 	}
 	go admin.Hub.Run()
 	go func() {
 		logger.Info(" ------------------------------------------------ ")
-		helpers.LogInfo("main", "Starting server", "port", cfg.port)
+		helpers.LogInfo("main", "Starting server", "port", configs.Configs.PORT)
 		logger.Info(" ------------------------------------------------ ")
 
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
@@ -148,22 +155,5 @@ func main() {
 	}
 
 	helpers.LogInfo("main", "Server exited gracefully")
-}
-
-func loadConfig() *config {
-	cfg := &config{
-		port:  os.Getenv("PORT"),
-		dbURL: os.Getenv("DBURL"),
-	}
-
-	if cfg.port == "" {
-		cfg.port = "3000"
-	}
-
-	if cfg.dbURL == "" {
-		helpers.LogError("loadConfig", "DBURL must be set in environment variables")
-		os.Exit(1) // Added Exit here as configuration is mandatory
-	}
-
-	return cfg
+	defer pool.Close()
 }

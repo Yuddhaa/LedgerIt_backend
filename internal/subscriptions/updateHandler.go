@@ -2,7 +2,6 @@ package subscriptions
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,18 +9,12 @@ import (
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/configs"
 	"LedgerIt/internal/helpers"
-
-	"github.com/jackc/pgx/v5"
 )
 
 func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
-	role, ok := auth.GetUserRoleFromContext(w, r)
-	if !ok {
-		return
-	}
-	if role != 1 {
-		return
-	}
+	// ****************************************************************************************************************
+	// get loggedin userInfo
+	// ****************************************************************************************************************
 	userId, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
 		return
@@ -31,6 +24,20 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// if not creator -> get out
+	role, ok := auth.GetUserRoleFromContext(w, r)
+	if !ok {
+		helpers.RespondWithError(w, http.StatusForbidden, "Only creator can create subscriptions")
+		helpers.LogError("UpdateHandler", "Only creator can update subscriptions", "role", role, "userId", userId)
+		return
+	}
+	if role != 1 {
+		return
+	}
+
+	// ****************************************************************************************************************
+	// if creator, decode the body and validate the parameters
+	// ****************************************************************************************************************
 	var body reqType
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Request")
@@ -42,17 +49,16 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// ****************************************************************************************************************
+	// for now this will be hardcoded to true regardless of the actual body input
+	// in future if this option needs to be used, can be used
+	// ****************************************************************************************************************
+	body.IsImmediate = true
+
+	// ****************************************************************************************************************
 	// get business current plan
 	// ****************************************************************************************************************
-	curPlan, err := h.db.GetBusinessCurrentPlan(r.Context(), businessId)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			helpers.RespondWithError(w, http.StatusNotFound, "Business not found")
-			helpers.LogInfo("UpdateHandler", "Business not found", "businessId", businessId)
-			return
-		}
-		helpers.RespondWithError(w, 500, "internal server error")
-		helpers.LogError("UpdateHandler", "db error fetching plan", "err", err.Error())
+	curPlan, ok := h.getCurrentPlan(w, r.Context(), businessId)
+	if !ok {
 		return
 	}
 	if !curPlan.CurrentPlanID.Valid {
@@ -102,6 +108,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		"business_id":         businessId,
 		"old_sub_id":          curPlan.SubscriptionID,
 		"old_sub_razorpay_id": curPlan.RazorpaySubscriptionID,
+		"is_immediate":        body.IsImmediate,
 	}
 	var startAt *int64
 	if !body.IsImmediate && curPlan.SubscriptionEndPeriod.Valid {

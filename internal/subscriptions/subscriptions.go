@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
 	"strconv"
 	"strings"
@@ -38,12 +37,14 @@ var (
 
 // reqType is used by /create and /update as a type for the r.Body
 type reqType struct {
-	Period      string `json:"period"`
-	BasePlan    string `json:"base_plan"`
-	AddOn       string `json:"add_on"`
-	IsTrialing  bool   `json:"is_trialing,omitempty"`
-	OfferCode   string `json:"offer_code,omitempty"`
-	IsImmediate bool   `json:"is_immediate,omitempty"`
+	Period     string `json:"period"`
+	BasePlan   string `json:"base_plan"`
+	AddOn      string `json:"add_on"`                // these 3 are used in both create and update
+	IsTrialing bool   `json:"is_trialing,omitempty"` // for create
+	OfferCode  string `json:"offer_code,omitempty"`  // for create
+	// for update, for now this will be hardcoded to true regardless of the actual body input
+	// in future if this option needs to be used, can be used
+	IsImmediate bool `json:"is_immediate,omitempty"`
 }
 
 // resType is used by /create and /update as a type to send responses
@@ -53,23 +54,12 @@ type resType struct {
 	RazorpaySubId  string      `json:"razorpay_sub_id"`
 }
 
-func NewHandler(db *db.Queries, pool *pgxpool.Pool) (*Handler, error) {
-	razorpayKey := os.Getenv("RAZORPAY_API_KEY")
-	if razorpayKey == "" {
-		helpers.LogError("subscriptions.NewHandler", "RAZORPAY_API_KEY is not set in environment")
-		return nil, fmt.Errorf("RAZORPAY_API_KEY is not set")
-	}
-	razorpaySecret := os.Getenv("RAZORPAY_API_SECRET")
-	if razorpaySecret == "" {
-		helpers.LogError("subscriptions.NewHandler", "RAZORPAY_API_SECRET is not set in environment")
-		return nil, fmt.Errorf("RAZORPAY_API_SECRET is not set")
-	}
-	rp_client := razorpay.NewClient(razorpayKey, razorpaySecret)
+func NewHandler(db *db.Queries, pool *pgxpool.Pool, rp_client *razorpay.Client) *Handler {
 	return &Handler{
 		db:        db,
 		pool:      pool,
 		rp_client: rp_client,
-	}, nil
+	}
 }
 
 func (h *Handler) Routes() chi.Router {
@@ -78,6 +68,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/plans", h.GetPlansHandler)
 	r.Post("/create", h.CreateHandler)
 	r.Post("/update", h.UpdateHandler)
+	r.Post("/{sub_id}/status", h.GetStatusHandler)
 	return r
 }
 
@@ -270,6 +261,12 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request, bod
 	if startAt != nil {
 		newSubscriptionData["start_at"] = *startAt
 	}
+	var status db.SubscriptionsStatus
+	if body.IsTrialing {
+		status = db.SubscriptionsStatusTrialingPending
+	} else {
+		status = db.SubscriptionsStatusPending
+	}
 	newRazorpaySub, err := h.rp_client.Subscription.Create(newSubscriptionData, nil)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
@@ -288,6 +285,7 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request, bod
 		BusinessID:             businessId,
 		PlanID:                 plan.ID,
 		RazorpaySubscriptionID: razorpaySubId,
+		Status:                 status,
 		MarketerID: pgtype.UUID{
 			Valid: false,
 		},
@@ -413,4 +411,19 @@ func (h *Handler) cancelSubscription(w http.ResponseWriter, curPlan db.GetBusine
 		}
 	}
 	return true
+}
+
+func (h *Handler) getCurrentPlan(w http.ResponseWriter, ctx context.Context, businessId pgtype.UUID) (db.GetBusinessCurrentPlanRow, bool) {
+	curPlan, err := h.db.GetBusinessCurrentPlan(ctx, businessId)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			helpers.RespondWithError(w, http.StatusNotFound, "Business not found")
+			helpers.LogInfo("UpdateHandler", "Business not found", "businessId", businessId)
+			return db.GetBusinessCurrentPlanRow{}, false
+		}
+		helpers.RespondWithError(w, 500, "internal server error")
+		helpers.LogError("UpdateHandler", "db error fetching plan", "err", err.Error())
+		return db.GetBusinessCurrentPlanRow{}, false
+	}
+	return curPlan, true
 }

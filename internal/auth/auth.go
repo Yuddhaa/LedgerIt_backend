@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"os"
 	"strings"
 
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers" // <-- ADDED THIS IMPORT
 
@@ -36,48 +36,17 @@ const userClaimsKey contextKey = "userClaims"
 
 // Handler holds dependencies for auth-related HTTP handlers.
 type Handler struct {
-	logger          *slog.Logger
-	db              *db.Queries
-	pool            *pgxpool.Pool
-	googleClientId  string
-	googleAndroidId string
-	googleIOSId     string
-	jwtSecret       string
+	logger *slog.Logger
+	db     *db.Queries
+	pool   *pgxpool.Pool
 }
 
 // NewHandler creates a new auth Handler, validating required environment variables.
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, logger *slog.Logger) (*Handler, error) {
-	googleClientID := os.Getenv("GOOGLE_WEB_CLIENT_ID")
-	if googleClientID == "" {
-		helpers.LogError("auth.NewHandler", "GOOGLE_WEB_CLIENT_ID is not set in environment")
-		return nil, fmt.Errorf("GOOGLE_WEB_CLIENT_ID is not set")
-	}
-
-	googleAndroidId := os.Getenv("GOOGLE_ANDROID_ID")
-	if googleClientID == "" {
-		helpers.LogError("auth.NewHandler", "GOOGLE_ANDROID_ID is not set in environment")
-		return nil, fmt.Errorf("GOOGLE_ANDROID_ID is not set")
-	}
-
-	googleIOSId := os.Getenv("GOOGLE_IOS_ID")
-	if googleClientID == "" {
-		helpers.LogError("auth.NewHandler", "GOOGLE_IOS_ID is not set in environment")
-		return nil, fmt.Errorf("GOOGLE_IOS_ID is not set")
-	}
-
-	jwtSecret := os.Getenv("JWT_SECRET")
-	if jwtSecret == "" {
-		helpers.LogError("auth.NewHandler", "JWT_SECRET is not set in environment")
-		return nil, fmt.Errorf("JWT_SECRET is not set")
-	}
 	return &Handler{
-		logger:          logger,
-		db:              db,
-		pool:            pool,
-		googleClientId:  googleClientID,
-		googleAndroidId: googleAndroidId,
-		googleIOSId:     googleIOSId,
-		jwtSecret:       jwtSecret,
+		logger: logger,
+		db:     db,
+		pool:   pool,
 	}, nil
 }
 
@@ -153,7 +122,7 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 				return nil, fmt.Errorf("unexpected signing method: %v", alg)
 			}
 			// Return the secret key
-			return []byte(h.jwtSecret), nil
+			return []byte(configs.Configs.JWT_SECRET), nil
 		})
 		// 4. Handle parsing errors
 		if err != nil {

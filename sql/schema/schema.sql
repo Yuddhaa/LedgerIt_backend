@@ -199,7 +199,7 @@ CREATE TABLE marketers (
 
 -- pending|trialing -> active
 CREATE TYPE subscriptions_status AS ENUM ( 'inactive', 'pending', 'trialing','trialing_pending', 'active', 
-    'past_due', 'paused', 'canceled', 'expired'
+    'past_due', 'paused', 'canceled', 'expired', 'authenticated'
 );
 
 CREATE TABLE subscriptions (

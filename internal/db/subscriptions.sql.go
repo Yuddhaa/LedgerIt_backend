@@ -11,6 +11,31 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const cancelSubscription = `-- name: CancelSubscription :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = 'canceled',
+        current_period_end = now(), -- Cut off access immediately (or keep date if you prefer)
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+    RETURNING id, business_id
+)
+UPDATE businesses
+SET 
+    subscriptions_status = 'canceled',
+    current_subscription_id = NULL -- Unlink the cancelled sub
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id
+  -- 🛑 SAFETY: Only cancel business status if this was the CURRENT active subscription
+  AND businesses.current_subscription_id = updated_sub.id
+`
+
+func (q *Queries) CancelSubscription(ctx context.Context, razorpaySubscriptionID string) error {
+	_, err := q.db.Exec(ctx, cancelSubscription, razorpaySubscriptionID)
+	return err
+}
+
 const checkUserPlanEligibility = `-- name: CheckUserPlanEligibility :one
 SELECT 
     -- Logic: If count of 'free' plans is 0, then Free IS available.
@@ -34,6 +59,38 @@ func (q *Queries) CheckUserPlanEligibility(ctx context.Context, ownerID pgtype.U
 	var i CheckUserPlanEligibilityRow
 	err := row.Scan(&i.FreeAvailable, &i.TrialAvailable)
 	return i, err
+}
+
+const createInvoice = `-- name: CreateInvoice :one
+INSERT INTO subscription_invoices (
+  subscription_id, business_id, razorpay_payment_id, amount_paid, currency, status
+) VALUES (
+  $1, $2, $3, $4, $5, $6
+) RETURNING id
+`
+
+type CreateInvoiceParams struct {
+	SubscriptionID    pgtype.UUID                `json:"subscription_id"`
+	BusinessID        pgtype.UUID                `json:"business_id"`
+	RazorpayPaymentID string                     `json:"razorpay_payment_id"`
+	AmountPaid        int64                      `json:"amount_paid"`
+	Currency          pgtype.Text                `json:"currency"`
+	Status            SubscriptionInvoicesStatus `json:"status"`
+}
+
+// Create the missing Invoice Query (we need this for the charged event)
+func (q *Queries) CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (pgtype.UUID, error) {
+	row := q.db.QueryRow(ctx, createInvoice,
+		arg.SubscriptionID,
+		arg.BusinessID,
+		arg.RazorpayPaymentID,
+		arg.AmountPaid,
+		arg.Currency,
+		arg.Status,
+	)
+	var id pgtype.UUID
+	err := row.Scan(&id)
+	return id, err
 }
 
 const createPlan = `-- name: CreatePlan :one
@@ -228,6 +285,46 @@ func (q *Queries) GetPlan(ctx context.Context, id string) (Plan, error) {
 	return i, err
 }
 
+const getSubscriptionByRazorpayID = `-- name: GetSubscriptionByRazorpayID :one
+SELECT id, business_id, plan_id, marketer_id, razorpay_subscription_id, current_period_start, current_period_end, status, is_offer_applied, created_at, updated_at FROM subscriptions WHERE razorpay_subscription_id = $1 LIMIT 1
+`
+
+// Query to find subscription by Razorpay ID (Critical for Webhooks)
+func (q *Queries) GetSubscriptionByRazorpayID(ctx context.Context, razorpaySubscriptionID string) (Subscription, error) {
+	row := q.db.QueryRow(ctx, getSubscriptionByRazorpayID, razorpaySubscriptionID)
+	var i Subscription
+	err := row.Scan(
+		&i.ID,
+		&i.BusinessID,
+		&i.PlanID,
+		&i.MarketerID,
+		&i.RazorpaySubscriptionID,
+		&i.CurrentPeriodStart,
+		&i.CurrentPeriodEnd,
+		&i.Status,
+		&i.IsOfferApplied,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getSubscriptionStatus = `-- name: GetSubscriptionStatus :one
+SELECT status FROM subscriptions WHERE business_id = $1 AND id = $2
+`
+
+type GetSubscriptionStatusParams struct {
+	BusinessID pgtype.UUID `json:"business_id"`
+	ID         pgtype.UUID `json:"id"`
+}
+
+func (q *Queries) GetSubscriptionStatus(ctx context.Context, arg GetSubscriptionStatusParams) (SubscriptionsStatus, error) {
+	row := q.db.QueryRow(ctx, getSubscriptionStatus, arg.BusinessID, arg.ID)
+	var status SubscriptionsStatus
+	err := row.Scan(&status)
+	return status, err
+}
+
 const updateBusinessSubscription = `-- name: UpdateBusinessSubscription :exec
 UPDATE businesses
 SET 
@@ -263,5 +360,117 @@ func (q *Queries) UpdateBusinessSubscription(ctx context.Context, arg UpdateBusi
 		arg.IsOfferUsed,
 		arg.CurrentSubscriptionID,
 	)
+	return err
+}
+
+const updateStatusIfPending = `-- name: UpdateStatusIfPending :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = $2,
+        -- Use sqlc.narg to handle optional End Date updates (for Trials)
+        current_period_end = COALESCE($4::TIMESTAMPTZ, current_period_end),
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+      -- ✅ ATOMIC GUARD: Only allow update if we are in "start" states
+      AND status::text IN ('inactive', 'pending', 'trialing_pending', 'authenticated')
+    RETURNING id, business_id, status, current_period_end,plan_id
+)
+UPDATE businesses
+SET 
+    subscriptions_status = updated_sub.status,
+    subscription_end_period = updated_sub.current_period_end,
+    current_plan_id = updated_sub.plan_id,
+    current_subscription_id = updated_sub.id,
+    is_trial_used = (is_trial_used OR COALESCE($3::boolean, false))
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id
+`
+
+type UpdateStatusIfPendingParams struct {
+	RazorpaySubscriptionID string              `json:"razorpay_subscription_id"`
+	Status                 SubscriptionsStatus `json:"status"`
+	IsTrialUsed            pgtype.Bool         `json:"is_trial_used"`
+	CurrentPeriodEnd       pgtype.Timestamptz  `json:"current_period_end"`
+}
+
+func (q *Queries) UpdateStatusIfPending(ctx context.Context, arg UpdateStatusIfPendingParams) error {
+	_, err := q.db.Exec(ctx, updateStatusIfPending,
+		arg.RazorpaySubscriptionID,
+		arg.Status,
+		arg.IsTrialUsed,
+		arg.CurrentPeriodEnd,
+	)
+	return err
+}
+
+const updateSubscriptionAndBusiness = `-- name: UpdateSubscriptionAndBusiness :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = $2,
+        current_period_start = $3,
+        current_period_end = $4,
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+    RETURNING id, business_id, status, current_period_end, plan_id
+)
+UPDATE businesses
+SET 
+    current_plan_id = updated_sub.plan_id,
+    subscriptions_status = updated_sub.status,
+    subscription_end_period = updated_sub.current_period_end,
+    current_subscription_id = updated_sub.id,
+    -- If $5 input is true, make it true.
+    -- Only if BOTH are false does it stay false.
+    is_trial_used = (is_trial_used OR COALESCE($5::boolean, false))
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id
+`
+
+type UpdateSubscriptionAndBusinessParams struct {
+	RazorpaySubscriptionID string              `json:"razorpay_subscription_id"`
+	Status                 SubscriptionsStatus `json:"status"`
+	CurrentPeriodStart     pgtype.Timestamptz  `json:"current_period_start"`
+	CurrentPeriodEnd       pgtype.Timestamptz  `json:"current_period_end"`
+	IsTrialUsed            pgtype.Bool         `json:"is_trial_used"`
+}
+
+// If 'is_trial_used' is already true, keep it true.
+func (q *Queries) UpdateSubscriptionAndBusiness(ctx context.Context, arg UpdateSubscriptionAndBusinessParams) error {
+	_, err := q.db.Exec(ctx, updateSubscriptionAndBusiness,
+		arg.RazorpaySubscriptionID,
+		arg.Status,
+		arg.CurrentPeriodStart,
+		arg.CurrentPeriodEnd,
+		arg.IsTrialUsed,
+	)
+	return err
+}
+
+const updateSubscriptionStatusRaw = `-- name: UpdateSubscriptionStatusRaw :exec
+WITH updated_sub AS (
+    UPDATE subscriptions
+    SET 
+        status = $2,
+        updated_at = now()
+    WHERE razorpay_subscription_id = $1
+    RETURNING id, business_id, status
+)
+UPDATE businesses
+SET 
+    subscriptions_status = updated_sub.status
+FROM updated_sub
+WHERE businesses.id = updated_sub.business_id
+`
+
+type UpdateSubscriptionStatusRawParams struct {
+	RazorpaySubscriptionID string              `json:"razorpay_subscription_id"`
+	Status                 SubscriptionsStatus `json:"status"`
+}
+
+// Used for simple state changes like Paused, Resumed, Pending, Halted
+func (q *Queries) UpdateSubscriptionStatusRaw(ctx context.Context, arg UpdateSubscriptionStatusRawParams) error {
+	_, err := q.db.Exec(ctx, updateSubscriptionStatusRaw, arg.RazorpaySubscriptionID, arg.Status)
 	return err
 }
