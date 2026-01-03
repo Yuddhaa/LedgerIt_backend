@@ -197,7 +197,14 @@ CREATE TABLE marketers (
 );
 
 
--- pending|trialing -> active
+-- used as of now 
+-- inactive -- in business table as a default
+-- pending -- in the subscripitons table as a default, also 'pending' is set when 'subscription.pending' webhook is arrived.
+-- trialing -- to show the business is in trial phase
+-- active -- business has active subscription
+-- past_due -- subscription is past_due for payment. This will be set after trial expires, or when 'subscription.halted' webhook arrives.
+-- paused -- when 'subscription.paused' webhook arrives.
+-- canceled -- when 'subscription.cancelled' webhook arrives(either user manually cancels through in-app, or while upgrading the plan or user cancles through UPI/card)
 CREATE TYPE subscriptions_status AS ENUM ( 'inactive', 'pending', 'trialing','trialing_pending', 'active', 
     'past_due', 'paused', 'canceled', 'expired', 'authenticated'
 );
@@ -261,11 +268,11 @@ CREATE INDEX idx_payouts_marketer_id ON marketer_payouts(marketer_id);
 
 ALTER TABLE businesses 
 ADD COLUMN current_plan_id TEXT REFERENCES plans(id) DEFAULT NULL,
-ADD COLUMN subscriptions_status subscriptions_status DEFAULT 'inactive',
+ADD COLUMN subscriptions_status subscriptions_status NOT NULL DEFAULT 'inactive',
 ADD COLUMN subscription_end_period TIMESTAMPTZ,
-ADD COLUMN is_trial_used BOOLEAN DEFAULT false,
+ADD COLUMN is_trial_used BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN current_subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
-ADD COLUMN is_offer_used BOOLEAN DEFAULT false;
+ADD COLUMN is_offer_used BOOLEAN NOT NULL DEFAULT false;
 
 --- funcitons ---
 

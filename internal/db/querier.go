@@ -109,7 +109,7 @@ type Querier interface {
 	// used to update balance in transactions
 	UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error
 	// UpdateBusinessSubscription updates subscriptions related columns
-	UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) error
+	UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) (Business, error)
 	// update a particular category
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party

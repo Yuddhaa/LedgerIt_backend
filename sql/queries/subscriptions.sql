@@ -19,6 +19,7 @@ SELECT
     p.currency,
     b.subscriptions_status,
     b.subscription_end_period,
+    b.is_trial_used,
     
     -- Fetch directly from the joined subscription table
     s.id AS subscription_id,
@@ -78,18 +79,21 @@ INSERT INTO subscriptions (
 ) RETURNING *;
 
 -- UpdateBusinessSubscription updates subscriptions related columns 
--- name: UpdateBusinessSubscription :exec
+-- name: UpdateBusinessSubscription :one
 UPDATE businesses
 SET 
     current_plan_id = $2,
     subscriptions_status = $3,
     subscription_end_period = $4,
-    -- If $5 is NULL, it keeps the existing 'is_trial_used' value
-    is_trial_used = COALESCE($5, is_trial_used),
-    is_offer_used = COALESCE($6,is_offer_used),
-    current_subscription_id = $7,
+    -- If 'is_trial_used' is already true, keep it true.
+    -- If input is true, make it true.
+    -- Only if BOTH are false does it stay false.
+    is_trial_used = (is_trial_used OR COALESCE(sqlc.narg('is_trial_used')::boolean, false)),
+    is_offer_used = (is_offer_used OR COALESCE(sqlc.narg('is_offer_used')::boolean, false)),
+    current_subscription_id = $5,
     updated_at = now()
-WHERE id = $1;
+WHERE id = $1
+RETURNING *;
 
 -- Create the missing Invoice Query (we need this for the charged event)
 -- name: CreateInvoice :one

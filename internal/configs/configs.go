@@ -24,8 +24,8 @@ var Configs configType
 const (
 	MONTHLY_ADDON = 7900
 	YEARLY_ADDON  = 70800
-	// TRIAL_DAYS    = time.Duration(90 * 24 * time.Hour)
-	TRIAL_DAYS   = time.Duration(time.Hour * 10)
+	TRIAL_DAYS    = time.Duration(90 * 24 * time.Hour)
+	// TRIAL_DAYS   = time.Duration(time.Minute * 10)
 	FREE_PLAN_ID = "permanent-solo-0"
 )
 

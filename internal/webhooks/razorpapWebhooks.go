@@ -61,8 +61,8 @@ func (h *Handler) RazorpayWebhooks(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	switch payload.Event {
-	case "subscription.authenticated":
-		handlerErr = h.handleSubscriptionAuthenticated(ctx, payload.Payload)
+	// case "subscription.authenticated":
+	// 	handlerErr = h.handleSubscriptionAuthenticated(ctx, payload.Payload)
 	case "subscription.charged":
 		handlerErr = h.handleSubscriptionCharged(ctx, payload.Payload)
 	case "subscription.cancelled":

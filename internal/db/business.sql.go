@@ -132,20 +132,20 @@ type GetBusinessByIDParams struct {
 }
 
 type GetBusinessByIDRow struct {
-	ID                    pgtype.UUID             `json:"id"`
-	Name                  string                  `json:"name"`
-	OwnerID               pgtype.UUID             `json:"owner_id"`
-	CreatedAt             pgtype.Timestamptz      `json:"created_at"`
-	UpdatedAt             pgtype.Timestamptz      `json:"updated_at"`
-	CurrentPlanID         pgtype.Text             `json:"current_plan_id"`
-	SubscriptionsStatus   NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndPeriod pgtype.Timestamptz      `json:"subscription_end_period"`
-	IsTrialUsed           pgtype.Bool             `json:"is_trial_used"`
-	CurrentSubscriptionID pgtype.UUID             `json:"current_subscription_id"`
-	IsOfferUsed           pgtype.Bool             `json:"is_offer_used"`
-	UserID                pgtype.UUID             `json:"user_id"`
-	Role                  BusinessRole            `json:"role"`
-	CurrentBalance        pgtype.Numeric          `json:"current_balance"`
+	ID                    pgtype.UUID         `json:"id"`
+	Name                  string              `json:"name"`
+	OwnerID               pgtype.UUID         `json:"owner_id"`
+	CreatedAt             pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz  `json:"updated_at"`
+	CurrentPlanID         pgtype.Text         `json:"current_plan_id"`
+	SubscriptionsStatus   SubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndPeriod pgtype.Timestamptz  `json:"subscription_end_period"`
+	IsTrialUsed           bool                `json:"is_trial_used"`
+	CurrentSubscriptionID pgtype.UUID         `json:"current_subscription_id"`
+	IsOfferUsed           bool                `json:"is_offer_used"`
+	UserID                pgtype.UUID         `json:"user_id"`
+	Role                  BusinessRole        `json:"role"`
+	CurrentBalance        pgtype.Numeric      `json:"current_balance"`
 }
 
 // Retrieves a single business record by its unique ID.

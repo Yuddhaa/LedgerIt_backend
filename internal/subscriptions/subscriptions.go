@@ -37,11 +37,10 @@ var (
 
 // reqType is used by /create and /update as a type for the r.Body
 type reqType struct {
-	Period     string `json:"period"`
-	BasePlan   string `json:"base_plan"`
-	AddOn      string `json:"add_on"`                // these 3 are used in both create and update
-	IsTrialing bool   `json:"is_trialing,omitempty"` // for create
-	OfferCode  string `json:"offer_code,omitempty"`  // for create
+	Period    string `json:"period"`
+	BasePlan  string `json:"base_plan"`
+	AddOn     string `json:"add_on"`               // these 3 are used in both create and update
+	OfferCode string `json:"offer_code,omitempty"` // for create
 	// for update, for now this will be hardcoded to true regardless of the actual body input
 	// in future if this option needs to be used, can be used
 	IsImmediate bool `json:"is_immediate,omitempty"`
@@ -66,6 +65,7 @@ func (h *Handler) Routes() chi.Router {
 	r := chi.NewRouter()
 	r.Use(h.GetRole)
 	r.Get("/plans", h.GetPlansHandler)
+	r.Post("/trial", h.trialHandler)
 	r.Post("/create", h.CreateHandler)
 	r.Post("/update", h.UpdateHandler)
 	r.Post("/{sub_id}/status", h.GetStatusHandler)
@@ -242,7 +242,7 @@ func (h *Handler) getOrCreatePlan(w http.ResponseWriter, r *http.Request, body r
 	return plan, true
 }
 
-func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request, body reqType,
+func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 	plan db.Plan, notes map[string]any, businessId pgtype.UUID, startAt *int64,
 ) (resType, bool) {
 	var totalCount int
@@ -261,12 +261,7 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request, bod
 	if startAt != nil {
 		newSubscriptionData["start_at"] = *startAt
 	}
-	var status db.SubscriptionsStatus
-	if body.IsTrialing {
-		status = db.SubscriptionsStatusTrialingPending
-	} else {
-		status = db.SubscriptionsStatusPending
-	}
+	status := db.SubscriptionsStatusPending
 	newRazorpaySub, err := h.rp_client.Subscription.Create(newSubscriptionData, nil)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
@@ -290,11 +285,6 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request, bod
 			Valid: false,
 		},
 		IsOfferApplied: false,
-	}
-	if body.IsTrialing {
-		createSubscriptionParams.Status = db.SubscriptionsStatusTrialingPending
-	} else {
-		createSubscriptionParams.Status = db.SubscriptionsStatusPending
 	}
 	subscription, err := h.db.CreateSubscription(r.Context(), createSubscriptionParams)
 	if err != nil {
@@ -357,10 +347,10 @@ func (h *Handler) handleSoloPlan(w http.ResponseWriter, r *http.Request, body re
 				return
 			}
 		}
-		err := h.db.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
+		_, err := h.db.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
 			ID:                    businessId,
 			CurrentPlanID:         pgtype.Text{String: plan.ID, Valid: true},
-			SubscriptionsStatus:   db.NullSubscriptionsStatus{SubscriptionsStatus: db.SubscriptionsStatusActive, Valid: true},
+			SubscriptionsStatus:   db.SubscriptionsStatusActive,
 			IsTrialUsed:           pgtype.Bool{Valid: false},
 			CurrentSubscriptionID: pgtype.UUID{Valid: false},
 			IsOfferUsed:           pgtype.Bool{Valid: false},

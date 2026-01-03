@@ -216,6 +216,7 @@ SELECT
     p.currency,
     b.subscriptions_status,
     b.subscription_end_period,
+    b.is_trial_used,
     
     -- Fetch directly from the joined subscription table
     s.id AS subscription_id,
@@ -233,15 +234,16 @@ WHERE b.id = $1
 `
 
 type GetBusinessCurrentPlanRow struct {
-	CurrentPlanID          pgtype.Text             `json:"current_plan_id"`
-	PlanName               pgtype.Text             `json:"plan_name"`
-	Amount                 pgtype.Int8             `json:"amount"`
-	Currency               pgtype.Text             `json:"currency"`
-	SubscriptionsStatus    NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndPeriod  pgtype.Timestamptz      `json:"subscription_end_period"`
-	SubscriptionID         pgtype.UUID             `json:"subscription_id"`
-	RazorpaySubscriptionID pgtype.Text             `json:"razorpay_subscription_id"`
-	MembersCount           int32                   `json:"members_count"`
+	CurrentPlanID          pgtype.Text         `json:"current_plan_id"`
+	PlanName               pgtype.Text         `json:"plan_name"`
+	Amount                 pgtype.Int8         `json:"amount"`
+	Currency               pgtype.Text         `json:"currency"`
+	SubscriptionsStatus    SubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndPeriod  pgtype.Timestamptz  `json:"subscription_end_period"`
+	IsTrialUsed            bool                `json:"is_trial_used"`
+	SubscriptionID         pgtype.UUID         `json:"subscription_id"`
+	RazorpaySubscriptionID pgtype.Text         `json:"razorpay_subscription_id"`
+	MembersCount           int32               `json:"members_count"`
 }
 
 // GetBusinessCurrentPlan gets the details on the current plan
@@ -255,6 +257,7 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 		&i.Currency,
 		&i.SubscriptionsStatus,
 		&i.SubscriptionEndPeriod,
+		&i.IsTrialUsed,
 		&i.SubscriptionID,
 		&i.RazorpaySubscriptionID,
 		&i.MembersCount,
@@ -325,42 +328,59 @@ func (q *Queries) GetSubscriptionStatus(ctx context.Context, arg GetSubscription
 	return status, err
 }
 
-const updateBusinessSubscription = `-- name: UpdateBusinessSubscription :exec
+const updateBusinessSubscription = `-- name: UpdateBusinessSubscription :one
 UPDATE businesses
 SET 
     current_plan_id = $2,
     subscriptions_status = $3,
     subscription_end_period = $4,
-    -- If $5 is NULL, it keeps the existing 'is_trial_used' value
-    is_trial_used = COALESCE($5, is_trial_used),
-    is_offer_used = COALESCE($6,is_offer_used),
-    current_subscription_id = $7,
+    -- If 'is_trial_used' is already true, keep it true.
+    -- If input is true, make it true.
+    -- Only if BOTH are false does it stay false.
+    is_trial_used = (is_trial_used OR COALESCE($6::boolean, false)),
+    is_offer_used = (is_offer_used OR COALESCE($7::boolean, false)),
+    current_subscription_id = $5,
     updated_at = now()
 WHERE id = $1
+RETURNING id, name, owner_id, created_at, updated_at, current_plan_id, subscriptions_status, subscription_end_period, is_trial_used, current_subscription_id, is_offer_used
 `
 
 type UpdateBusinessSubscriptionParams struct {
-	ID                    pgtype.UUID             `json:"id"`
-	CurrentPlanID         pgtype.Text             `json:"current_plan_id"`
-	SubscriptionsStatus   NullSubscriptionsStatus `json:"subscriptions_status"`
-	SubscriptionEndPeriod pgtype.Timestamptz      `json:"subscription_end_period"`
-	IsTrialUsed           pgtype.Bool             `json:"is_trial_used"`
-	IsOfferUsed           pgtype.Bool             `json:"is_offer_used"`
-	CurrentSubscriptionID pgtype.UUID             `json:"current_subscription_id"`
+	ID                    pgtype.UUID         `json:"id"`
+	CurrentPlanID         pgtype.Text         `json:"current_plan_id"`
+	SubscriptionsStatus   SubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndPeriod pgtype.Timestamptz  `json:"subscription_end_period"`
+	CurrentSubscriptionID pgtype.UUID         `json:"current_subscription_id"`
+	IsTrialUsed           pgtype.Bool         `json:"is_trial_used"`
+	IsOfferUsed           pgtype.Bool         `json:"is_offer_used"`
 }
 
 // UpdateBusinessSubscription updates subscriptions related columns
-func (q *Queries) UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) error {
-	_, err := q.db.Exec(ctx, updateBusinessSubscription,
+func (q *Queries) UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) (Business, error) {
+	row := q.db.QueryRow(ctx, updateBusinessSubscription,
 		arg.ID,
 		arg.CurrentPlanID,
 		arg.SubscriptionsStatus,
 		arg.SubscriptionEndPeriod,
+		arg.CurrentSubscriptionID,
 		arg.IsTrialUsed,
 		arg.IsOfferUsed,
-		arg.CurrentSubscriptionID,
 	)
-	return err
+	var i Business
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.OwnerID,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.CurrentPlanID,
+		&i.SubscriptionsStatus,
+		&i.SubscriptionEndPeriod,
+		&i.IsTrialUsed,
+		&i.CurrentSubscriptionID,
+		&i.IsOfferUsed,
+	)
+	return i, err
 }
 
 const updateStatusIfPending = `-- name: UpdateStatusIfPending :exec

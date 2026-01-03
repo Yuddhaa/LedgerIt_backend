@@ -106,12 +106,6 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 			rzpSubIDStr = &s
 		}
 
-		// Enum -> String
-		var statusStr any = nil
-		if dbPlan.SubscriptionsStatus.Valid {
-			statusStr = dbPlan.SubscriptionsStatus.SubscriptionsStatus
-		}
-
 		// C. Build the Object
 		res.CurrentPlan = &currentPlanDetails{
 			PlanID:                 &dbPlan.CurrentPlanID.String,
@@ -119,7 +113,7 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 			BasePlan:               basePlan,
 			AddOn:                  addon,
 			MembersCount:           dbPlan.MembersCount,
-			Status:                 statusStr,
+			Status:                 dbPlan.SubscriptionsStatus,
 			Name:                   &dbPlan.PlanName.String,
 			Amount:                 &dbPlan.Amount.Int64,
 			Currency:               &dbPlan.Currency.String,

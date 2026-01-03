@@ -61,8 +61,9 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if !curPlan.CurrentPlanID.Valid {
-		helpers.RespondWithError(w, http.StatusConflict, "business doesn't have a current plan")
+	if !curPlan.SubscriptionID.Valid {
+		helpers.RespondWithError(w, http.StatusConflict, `No active Razorpay subscription found.
+		Please use /create to upgrade from a Trial.`)
 		helpers.LogError("UpdateHandler", "business doesn't have a current plan", "businessId", businessId)
 		return
 	}
@@ -115,7 +116,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		temp := curPlan.SubscriptionEndPeriod.Time.Unix()
 		startAt = &temp
 	}
-	res, ok := h.createSubscription(w, r, body, plan, notes, businessId, startAt)
+	res, ok := h.createSubscription(w, r, plan, notes, businessId, startAt)
 	helpers.RespondWithJSON(w, 200, res)
 	helpers.LogInfo("UpdateHandler", "subscription created", "res", res)
 }

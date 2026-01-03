@@ -3,10 +3,8 @@ package subscriptions
 import (
 	"encoding/json"
 	"net/http"
-	"time"
 
 	"LedgerIt/internal/auth"
-	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 )
@@ -58,15 +56,16 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Logic: If they have a plan ID, and the status implies it's still "alive" (not canceled/expired), block them.
-	if curPlan.CurrentPlanID.Valid {
-		status := curPlan.SubscriptionsStatus.SubscriptionsStatus
+	if curPlan.SubscriptionID.Valid {
+		status := curPlan.SubscriptionsStatus
 
-		// Check if the subscription is in a state that blocks new creation
-		isActiveOrPaused := status != db.SubscriptionsStatusCanceled && status != db.SubscriptionsStatusExpired
+		// Logic: We want to BLOCK if the status is "Alive".
+		// "Alive" means it is NOT canceled AND it is NOT past_due.
+		isAlive := status != db.SubscriptionsStatusCanceled && status != db.SubscriptionsStatusPastDue
 
-		if isActiveOrPaused {
+		// If it IS alive, we throw the error.
+		if isAlive {
 			helpers.LogError("CreateHandler", "Business already has an active link", "businessId", businessId, "status", status)
-			// Use 409 Conflict logic
 			helpers.RespondWithError(w, http.StatusConflict, "Subscription already exists. Please use /update to change your plan.")
 			return
 		}
@@ -77,21 +76,6 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if body.BasePlan == "solo" {
 		h.handleSoloPlan(w, r, body, userId, businessId, false, db.GetBusinessCurrentPlanRow{})
 		return
-	}
-
-	// check if trial is allowed
-	if body.IsTrialing {
-		trialOrSoloAllowed, err := h.db.CheckUserPlanEligibility(r.Context(), userId)
-		if err != nil {
-			helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
-			helpers.LogError("CreateHandler", "db error in CheckUserPlanEligibility", "err", err.Error())
-			return
-		}
-		if !trialOrSoloAllowed.TrialAvailable {
-			helpers.RespondWithError(w, http.StatusForbidden, "Trial is not available")
-			helpers.LogInfo("CreateHandler", "Trial is not available", "businessId", businessId)
-			return
-		}
 	}
 
 	// ****************************************************************************************************************
@@ -108,15 +92,10 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		"type":        "fresh", // Tells Webhook: "Don't look for old subs to cancel"
 		"user_id":     userId,
 		"business_id": businessId,
-		"is_trialing": body.IsTrialing,
 	}
 
-	var startAt *int64
-	if body.IsTrialing {
-		temp := time.Now().Add(configs.TRIAL_DAYS).Unix()
-		startAt = &temp
-	}
-	res, ok := h.createSubscription(w, r, body, plan, notes, businessId, startAt)
+	// Start Immediately (startAt = nil)
+	res, ok := h.createSubscription(w, r, plan, notes, businessId, nil)
 	helpers.RespondWithJSON(w, 200, res)
 	helpers.LogInfo("CreateHandler", "subscription created", "res", res)
 }
