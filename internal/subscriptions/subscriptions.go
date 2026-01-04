@@ -68,7 +68,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/trial", h.trialHandler)
 	r.Post("/create", h.CreateHandler)
 	r.Post("/update", h.UpdateHandler)
-	r.Post("/{sub_id}/status", h.GetStatusHandler)
+	r.Get("/{sub_id}/status", h.GetStatusHandler)
 	return r
 }
 

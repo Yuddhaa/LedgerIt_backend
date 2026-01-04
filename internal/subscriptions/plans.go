@@ -35,7 +35,6 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 		CurrentPlan      *currentPlanDetails           `json:"current_plan"` // Pointer allows null
 		IsFreeAvailable  bool                          `json:"is_free_available"`
 		IsTrialAvailable bool                          `json:"is_trial_available"`
-		IsOfferAvailable bool                          `json:"is_offer_available"`
 		MonthlyAddon     int                           `json:"monthly_addon"`
 		YearlyAddon      int                           `json:"yearly_addon"`
 		Plans            map[string]configs.PlanStruct `json:"base_plans"`
@@ -76,7 +75,6 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 	res := resType{
 		IsFreeAvailable:  planEligibility.FreeAvailable,
 		IsTrialAvailable: planEligibility.TrialAvailable,
-		IsOfferAvailable: false, // Placeholder for future logic
 		MonthlyAddon:     configs.MONTHLY_ADDON,
 		YearlyAddon:      configs.YEARLY_ADDON,
 		Plans:            configs.Plans,

@@ -48,7 +48,7 @@ func (h *Handler) GetStatusHandler(w http.ResponseWriter, r *http.Request) {
 	res := struct {
 		Status db.SubscriptionsStatus `json:"status"`
 	}{Status: status}
-	helpers.LogError("GetStatusHandler", "status sent", "status", status,
+	helpers.LogInfo("GetStatusHandler", "status sent", "status", status,
 		"businessId", businessId, "subscriptionId", subscriptionId)
 	helpers.RespondWithJSON(w, 200, res)
 }

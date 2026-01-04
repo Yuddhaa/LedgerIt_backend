@@ -2,69 +2,154 @@ package webhooks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"time"
 
-	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
 	"github.com/jackc/pgx/v5/pgtype"
+	razorpayUtils "github.com/razorpay/razorpay-go/utils"
 )
 
-func (h *Handler) handleSubscriptionAuthenticated(ctx context.Context, payload map[string]any) error {
-	// ****************************************************************************************************************
-	// extarct the subscription data
-	// ****************************************************************************************************************
-	rzpSubID, notes, err := extractSubscriptionData(payload)
+type webhookPayload struct {
+	Event   string         `json:"event"`
+	Payload map[string]any `json:"payload"`
+}
+
+type SubscriptionEntity struct {
+	ID        string         `json:"id"`
+	Status    string         `json:"status"`
+	PlanID    string         `json:"plan_id"`
+	StartAt   int64          `json:"start_at"`
+	ChargeAt  int64          `json:"charge_at"`
+	PaidCount int            `json:"paid_count"`
+	Notes     map[string]any `json:"notes"`
+}
+
+func (h *Handler) RazorpayWebhooks(w http.ResponseWriter, r *http.Request) {
+	// 1. Read Body
+	bodyBytes, err := io.ReadAll(r.Body)
 	if err != nil {
-		helpers.LogError("handleSubscriptionAuthenticated", "error in extractSubscriptionData", "err", err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		helpers.LogError("RazorpayHandler", "bad request", "err", err.Error())
+		return
+	}
+	bodyStr := string(bodyBytes)
+
+	// 2. Verify Signature
+	signature := r.Header.Get("X-Razorpay-Signature")
+	if !razorpayUtils.VerifyWebhookSignature(bodyStr, signature, h.razorpayWebhookSecret) {
+		helpers.LogError("RazorpayHandler", "invalid signature", "sig", signature)
+		helpers.RespondWithError(w, http.StatusUnauthorized, "invalid signature")
+		return
+	}
+
+	// 3. Parse JSON
+	var payload webhookPayload
+	if err := json.Unmarshal(bodyBytes, &payload); err != nil {
+		helpers.LogError("RazorpayHandler", "failed to parse json", "err", err.Error())
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	helpers.LogInfo("RazorpayHandler", "Event Received", "event", payload.Event)
+
+	// 4. Handle Events
+	var handlerErr error
+	ctx := r.Context()
+
+	switch payload.Event {
+	// case "subscription.authenticated":
+	// 	handlerErr = h.handleSubscriptionAuthenticated(ctx, payload.Payload)
+	case "subscription.charged":
+		handlerErr = h.handleSubscriptionCharged(ctx, payload.Payload)
+	case "subscription.cancelled":
+		handlerErr = h.handleSubscriptionCancelled(ctx, payload.Payload)
+	case "subscription.paused":
+		handlerErr = h.handleSubscriptionPaused(ctx, payload.Payload)
+	case "subscription.resumed":
+		handlerErr = h.handleSubscriptionResumed(ctx, payload.Payload)
+	case "subscription.pending":
+		handlerErr = h.handleSubscriptionPending(ctx, payload.Payload)
+	case "subscription.halted":
+		handlerErr = h.handleSubscriptionHalted(ctx, payload.Payload)
+	}
+	if handlerErr != nil {
+		// CRITICAL FIX: Return 500 to trigger Razorpay Retry
+		// We trust that our handlers only return errors for "Retryable" issues (DB connection, Lock timeout, etc.)
+		helpers.LogError("RazorpayHandler", "Transient Error - Requesting Retry", "event", payload.Event, "err", handlerErr.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// Success
+	w.WriteHeader(http.StatusOK)
+}
+
+// ********************************************************************************************************************
+// ********************************************************************************************************************
+// -- helper functions --
+// ********************************************************************************************************************
+// ********************************************************************************************************************
+
+// Helper to extract common data safely
+func extractSubscriptionData(payload map[string]any) (string, map[string]any, error) {
+	// Safety checks for nil maps should be added if payload is unpredictable,
+	// but Razorpay structure is consistent for these events.
+	subEntity, ok := payload["subscription"].(map[string]any)["entity"].(map[string]any)
+	if !ok {
+		return "", map[string]any{}, fmt.Errorf("cannot convert payload subscription or entity")
+	}
+	rzpSubID, ok := subEntity["id"].(string)
+	if !ok {
+		return "", map[string]any{}, fmt.Errorf("cannot convert payload id")
+	}
+	notes, ok := subEntity["notes"].(map[string]any)
+	if !ok {
+		return "", map[string]any{}, fmt.Errorf("cannot convert notes")
+	}
+	return rzpSubID, notes, nil
+}
+
+// Helper to handle simple state transitions (Paused, Resumed, Pending, Halted)
+// It includes the "Zombie Guard" to prevent resurrecting cancelled subscriptions.
+func (h *Handler) updateSubscriptionStateSafe(ctx context.Context, payload map[string]any, targetStatus db.SubscriptionsStatus, eventName string) error {
+	rzpSubID, _, err := extractSubscriptionData(payload)
+	if err != nil {
+		helpers.LogError("updateSubscriptionStateSafe", "err in extractSubscriptionData", "err", err.Error())
 		return err
 	}
 
-	// ****************************************************************************************************************
-	// extarct the subscription data
-	// ****************************************************************************************************************
-	// Check if it's a Trial
-	isTrial := false
-	if val, ok := notes["is_trialing"].(string); ok && val == "1" {
-		isTrial = true
-	}
-	if val, ok := notes["is_trialing"].(bool); ok && val {
-		isTrial = true
+	// 1. Fetch Current State
+	sub, err := h.db.GetSubscriptionByRazorpayID(ctx, rzpSubID)
+	if err != nil {
+		// Return error to trigger Razorpay retry (in case of DB glitches)
+		return err
 	}
 
-	var newStatus db.SubscriptionsStatus
-	var endDate time.Time
-	updateDate := false
-	isTrialUsed := false
-
-	if isTrial {
-		newStatus = db.SubscriptionsStatusTrialing
-		endDate = time.Now().Add(configs.TRIAL_DAYS)
-		updateDate = true
-		isTrialUsed = true
-		helpers.LogInfo("Webhook", "Trial Authenticated -> Granting Access", "id", rzpSubID)
-	} else {
-		newStatus = db.SubscriptionsStatusAuthenticated
-		helpers.LogInfo("Webhook", `Paid Plan Authenticated, based on when charged event arrived
-			status will be either 'authenticated' or 'active'`, "id", rzpSubID)
+	// 2. Zombie Guard
+	if sub.Status == db.SubscriptionsStatusCanceled {
+		helpers.LogInfo("Webhook", fmt.Sprintf("Ignoring '%s' event - Subscription is Cancelled", eventName), "id", rzpSubID)
+		return nil // Return nil to swallow the event (success)
 	}
 
-	// ****************************************************************************************************************
-	// extarct the subscription data
-	// ****************************************************************************************************************
-
-	// Atomic Update (The SQL Guard handles the protection)
-	// If the status is ALREADY 'active' or 'trialing' (from a 'charged' event),
-	// this query will simply find 0 rows and do nothing.
-	return h.db.UpdateStatusIfPending(ctx, db.UpdateStatusIfPendingParams{
+	// 3. Update Status
+	helpers.LogInfo("Webhook", fmt.Sprintf("Processing '%s' -> Setting status to '%s'", eventName, targetStatus), "id", rzpSubID)
+	return h.db.UpdateSubscriptionStatusRaw(ctx, db.UpdateSubscriptionStatusRawParams{
 		RazorpaySubscriptionID: rzpSubID,
-		Status:                 newStatus,
-		IsTrialUsed:            pgtype.Bool{Bool: isTrialUsed, Valid: true},
-		CurrentPeriodEnd:       pgtype.Timestamptz{Time: endDate, Valid: updateDate},
+		Status:                 targetStatus,
 	})
 }
+
+// ********************************************************************************************************************
+// ********************************************************************************************************************
+// handlers for each event
+// ********************************************************************************************************************
+// ********************************************************************************************************************
 
 func (h *Handler) handleSubscriptionCharged(ctx context.Context, payload map[string]any) error {
 	// ****************************************************************************************************************
@@ -85,10 +170,10 @@ func (h *Handler) handleSubscriptionCharged(ctx context.Context, payload map[str
 	}
 	defer tx.Rollback(ctx)
 	qtx := h.db.WithTx(tx)
+
 	// ****************************************************************************************************************
 	// extarct some more requrired data
 	// ****************************************************************************************************************
-
 	paymentEntity, ok := payload["payment"].(map[string]any)["entity"].(map[string]any)
 	if !ok {
 		return fmt.Errorf("cannot convert payload payments or entity")
@@ -128,7 +213,7 @@ func (h *Handler) handleSubscriptionCharged(ctx context.Context, payload map[str
 		return err
 	}
 
-	// ZOMBIE GUARD (The Fix)
+	// ZOMBIE GUARD
 	// If the subscription is already cancelled, a late 'charged' event should not reactivate it.
 	if subRow.Status == db.SubscriptionsStatusCanceled {
 		helpers.LogInfo("Webhook", "Ignored 'charged' event for Cancelled subscription", "id", rzpSubID, "pay_id", paymentID)
@@ -173,7 +258,7 @@ func (h *Handler) handleSubscriptionCharged(ctx context.Context, payload map[str
 	}
 
 	isTrial := false
-	// 🔥 THE FIX: Only set to 'Trialing' if it is the VERY FIRST payment (Auth Fee)
+	// THE FIX: Only set to 'Trialing' if it is the VERY FIRST payment (Auth Fee)
 	// If paid_count > 1, it is a renewal, so it must be Active (Paid).
 	if isTrialNote && paidCount <= 1 {
 		finalStatus = db.SubscriptionsStatusTrialing
