@@ -24,7 +24,6 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	type resType struct {
 		Transaction db.Transaction `json:"transaction"`
 	}
-	helpers.PrintJson("AddTransactionsHandler body", body)
 	// set up all the transactions column
 	// user id
 	userId, ok := auth.GetUserIdFromContext(w, r)

@@ -117,6 +117,6 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		startAt = &temp
 	}
 	res, ok := h.createSubscription(w, r, plan, notes, businessId, startAt)
-	helpers.RespondWithJSON(w, 200, res)
+	helpers.RespondWithJSON(w, 201, res)
 	helpers.LogInfo("UpdateHandler", "subscription created", "res", res)
 }

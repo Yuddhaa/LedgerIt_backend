@@ -73,7 +73,8 @@ func (h *Handler) trialHandler(w http.ResponseWriter, r *http.Request) {
 	// Block if they have EVER had a subscription status change (paid/cancelled/expired)
 	// (i.e. If your status is ANYTHING other than 'inactive', you have a history.)
 	if curPlan.IsTrialUsed || curPlan.SubscriptionsStatus != db.SubscriptionsStatusInactive {
-		helpers.RespondWithError(w, 409, "trial is already used")
+		helpers.RespondWithError(w, 409, "trial is already used or status is other than inactive which means"+
+			" business has a history with subscriptions")
 		helpers.LogError("trialHandler", "trial is already used", "businessId", businessId)
 		return
 	}

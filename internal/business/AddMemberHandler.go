@@ -3,8 +3,11 @@ package business
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"LedgerIt/internal/auth"
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
@@ -26,6 +29,19 @@ func (h *Handler) AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogInfo("AddMemberHandler", "not an admin|creator")
 		return
 	}
+	curPlan, ok := auth.GetCurPlanFromContext(w, r)
+	if !ok {
+		return
+	}
+	baseName := strings.Split(curPlan.CurrentPlanID.String, "-")[1]
+	addOnInt, _ := strconv.Atoi(strings.Split(curPlan.CurrentPlanID.String, "-")[2])
+	membersLimit := configs.Plans[baseName].UsersLimit + addOnInt
+	if !(membersLimit > int(curPlan.MembersCount)) {
+		helpers.RespondWithError(w, 403, "plan members limit reached")
+		helpers.LogInfo("AddMemberHandler", "plan members limit reached")
+		return
+	}
+
 	type reqType struct {
 		UserId string          `json:"user_id"`
 		Role   db.BusinessRole `json:"role"`

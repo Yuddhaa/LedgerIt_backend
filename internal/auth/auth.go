@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 
 	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
@@ -18,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -113,7 +115,7 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 
 		// 3. Parse and validate the token
 		claims := &Claims{}
-		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
+		token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
 			// Security check: Make sure the token's signing method is what we expect
 			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 				// This is a potential security issue (e.g., alg-none attack). Log as Error.
@@ -150,6 +152,148 @@ func (h *Handler) JwtAuthMiddleware(next http.Handler) http.Handler {
 		// 7. Call the next handler with the new context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// This interface lists ONLY the methods the middleware uses.
+// Your *db.Queries struct automatically satisfies this interface.
+type roleQuerier interface {
+	GetUserRole(ctx context.Context, arg db.GetUserRoleParams) (db.BusinessRole, error)
+}
+
+// The Middleware Factory
+// It accepts the Interface (q) and returns the standard middleware function
+// Getrole returns int corresponding to the role as below
+// -1 - err
+// 0 - not a member => for these 2 automatically the middleware returns respective status code
+// 1 - creator
+// 2 - employee
+// 3 - admin
+func GetRole(q roleQuerier) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// ************************************************************************************************************
+			// validate role
+			// ************************************************************************************************************
+			roleInt := -1
+			userId, ok := GetUserIdFromContext(w, r)
+			if !ok {
+				return
+			}
+			businessId, ok := ExtractUUID(w, r, "id")
+			if !ok {
+				return
+			}
+			role, err := q.GetUserRole(r.Context(), db.GetUserRoleParams{
+				UserID:     userId,
+				BusinessID: businessId,
+			})
+			if err != nil {
+				if errors.Is(err, pgx.ErrNoRows) {
+					helpers.RespondWithError(w, http.StatusUnauthorized, "no user found")
+					helpers.LogInfo("GetRole", "no user found", "userId", userId, "businessId", businessId)
+					roleInt = 0
+					return
+				}
+				helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
+				helpers.LogError("getrole", "db error in GetUserRole", "error", err.Error(), "userId", userId, "businessId", businessId)
+				roleInt = -1
+				return
+			}
+			switch role {
+			case db.BusinessRoleEmployee:
+				roleInt = 2 // employee
+			case db.BusinessRoleAdmin:
+				roleInt = 3 // admin
+			default:
+				roleInt = 1 // creator
+			}
+
+			ctx := context.WithValue(r.Context(), "role", roleInt)
+			// ************************************************************************************************************
+			// next
+			// ************************************************************************************************************
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// This interface lists ONLY the methods the middleware uses.
+// Your *db.Queries struct automatically satisfies this interface.
+type planQuerier interface {
+	GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (db.GetBusinessCurrentPlanRow, error)
+	UpdateBusinessSubscription(ctx context.Context, arg db.UpdateBusinessSubscriptionParams) (db.Business, error)
+}
+
+// ValidatePlan is The Middleware Factory
+// It accepts the Interface (q) and returns the standard middleware function
+func ValidatePlan(q planQuerier) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			businessId, ok := ExtractUUID(w, r, "id")
+			if !ok {
+				return
+			}
+			// ************************************************************************************************************
+			// validate the plans
+			// ************************************************************************************************************
+			curPlan, err := q.GetBusinessCurrentPlan(r.Context(), businessId)
+			if err != nil {
+				// err no rows is not required since in getrole its already established that the Business exists
+				helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
+				helpers.LogError("getrole", "db error in GetBusinessCurrentPlan", "error", err.Error(),
+					"businessId", businessId)
+				return
+			}
+
+			if !curPlan.SubscriptionEndPeriod.Valid || !curPlan.CurrentPlanID.Valid ||
+				curPlan.SubscriptionsStatus == db.SubscriptionsStatusCanceled {
+				helpers.RespondWithError(w, http.StatusForbidden, "no active subscription")
+				helpers.LogInfo("getrole", "no active subscription", "businessId", businessId)
+				return
+			}
+
+			if curPlan.SubscriptionEndPeriod.Valid &&
+				// since it might take razorpay to make the payment, consider an hour of buffer after SubscriptionEndPeriod
+				curPlan.SubscriptionEndPeriod.Time.Add(time.Hour).Compare(time.Now()) == -1 {
+				// if curPlan.SubscriptionsStatus != db.SubscriptionsStatusActive {
+				// }
+				// if curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialing {
+				// }
+
+				if _, err := q.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
+					ID:                    businessId,
+					CurrentPlanID:         curPlan.CurrentPlanID,
+					SubscriptionsStatus:   db.SubscriptionsStatusPastDue,
+					CurrentSubscriptionID: curPlan.SubscriptionID,
+					// leave curPlan.SubscriptionEndPeriod, it will be set to NULL
+				}); err != nil {
+					helpers.RespondWithError(w, 500, "internal server error")
+					helpers.LogError("getrole", "db error in UpdateBusinessSubscription", "err", err.Error())
+					return
+				}
+				helpers.RespondWithError(w, http.StatusForbidden, "no active subscription")
+				helpers.LogInfo("getrole", "no active subscription", "businessId", businessId)
+				return
+			}
+
+			ctx := context.WithValue(r.Context(), "curPlan", curPlan)
+			// ************************************************************************************************************
+			// next
+			// ************************************************************************************************************
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+// GetCurPlanFromContext extract and returns curPlan id form context
+func GetCurPlanFromContext(w http.ResponseWriter, r *http.Request) (db.GetBusinessCurrentPlanRow, bool) {
+	curPlan, ok := r.Context().Value("curPlan").(db.GetBusinessCurrentPlanRow)
+	if !ok {
+		helpers.LogError("GetCurPlanFromContext", "cannot convert curPlan to db.GetBusinessCurrentPlanRow")
+		helpers.RespondWithError(w, 500, "inter server error")
+		return db.GetBusinessCurrentPlanRow{}, false
+	}
+	return curPlan, true
 }
 
 // GetUserIdFromContext extract and returns user id form context
@@ -197,9 +341,9 @@ func GetClaimsFromContext(ctx context.Context) (*Claims, bool) {
 }
 
 // GetUserRole extract and returns user id form context
-// 1 - creator
-// 2 - employee
-// 3 - admin
+// (1 - creator)
+// (2 - employee)
+// (3 - admin)
 func GetUserRoleFromContext(w http.ResponseWriter, r *http.Request) (int, bool) {
 	role, ok := r.Context().Value("role").(int)
 	if !ok {
@@ -232,7 +376,7 @@ func generateSecureRandomString(n int) (string, error) {
 	if _, err := rand.Read(b); err != nil {
 		// This is a rare, critical system-level error.
 		helpers.LogError("auth.generateSecureRandomString", "failed to read from crypto/rand", "error", err.Error())
-		return "", fmt.Errorf("failed to read from crypto/rand: %w", err.Error())
+		return "", fmt.Errorf("failed to read from crypto/rand: %s", err.Error())
 	}
 
 	return hex.EncodeToString(b), nil

@@ -40,16 +40,29 @@ func (h *Handler) Routes() chi.Router {
 
 	// Routes that require a business ID
 	r.Route("/{id}", func(r chi.Router) {
+		r.Use(auth.GetRole(h.db))
+
+		// ************************************************************************
+		// 1. READ-ONLY & CLEANUP (Available even if Expired)
+		// ************************************************************************
 		r.Get("/", h.GetBusinessHandler)
 		r.Get("/members", h.GetBusinessMembers)
 		r.Get("/balance", h.GetBalance)
+
+		// Delete Business handles its own "Active Sub" check internally,
+		// so it sits here safely outside ValidatePlan.
+		r.Delete("/", h.DeleteBusinessHandler)
+
+		// ************************************************************************
+		// 2. WRITE/FEATURE ROUTES (Require Active Plan)
+		// ************************************************************************
 		r.Group(func(r chi.Router) {
-			r.Use(h.GetRole) // for admin|creator related routes
+			r.Use(auth.ValidatePlan(h.db))
+
 			r.Post("/members", h.AddMemberHandler)
 			r.Patch("/members", h.UpdateMemberHandler)
 			r.Delete("/members/{member_id}", h.DeleteMemberHandler)
 			r.Patch("/", h.UpdateBusinessHandler)
-			r.Delete("/", h.DeleteBusinessHandler)
 		})
 	})
 	return r

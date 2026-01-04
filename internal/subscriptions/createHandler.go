@@ -96,6 +96,6 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Start Immediately (startAt = nil)
 	res, ok := h.createSubscription(w, r, plan, notes, businessId, nil)
-	helpers.RespondWithJSON(w, 200, res)
+	helpers.RespondWithJSON(w, 201, res)
 	helpers.LogInfo("CreateHandler", "subscription created", "res", res)
 }

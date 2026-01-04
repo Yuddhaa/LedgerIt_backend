@@ -13,6 +13,15 @@ import (
 )
 
 func (h *Handler) UpdateCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	role, ok := auth.GetUserRoleFromContext(w, r)
+	if !ok {
+		return
+	}
+	if role == 2 {
+		helpers.LogError("UpdateCategoryHandler", "Not an admin or creator to update categories")
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Not an admin or creator")
+		return
+	}
 	type reqType struct {
 		Name string `json:"name"`
 	}

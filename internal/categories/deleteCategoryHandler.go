@@ -12,6 +12,15 @@ import (
 )
 
 func (h *Handler) DeleteCategoryHandler(w http.ResponseWriter, r *http.Request) {
+	role, ok := auth.GetUserRoleFromContext(w, r)
+	if !ok {
+		return
+	}
+	if role == 2 {
+		helpers.LogError("DeleteCategoryHandler", "Not an admin or creator to delete categories")
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Not an admin or creator")
+		return
+	}
 	businessId, ok := auth.ExtractUUID(w, r, "id")
 	if !ok {
 		return
