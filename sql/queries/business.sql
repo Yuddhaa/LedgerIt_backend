@@ -104,3 +104,7 @@ DELETE FROM business_members WHERE user_id = $1 AND business_id = $2;
 -- used to get a member details
 -- name: GetMemberRoleBalance :one
 Select role, current_balance FROM business_members WHERE user_id = $1 AND business_id = $2;
+
+-- used to delete a transactions
+-- name: DeleteTransaction :one
+DELETE FROM transactions WHERE id=$1 AND business_id = $2 RETURNING user_id, amount, direction;

@@ -48,6 +48,8 @@ type Querier interface {
 	// DeleteRefreshTokensByUserID deletes all refresh tokens for a specific user.
 	// This is used for the "log out from all devices" feature.
 	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	// used to delete a transactions
+	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) (DeleteTransactionRow, error)
 	// Retrieves a single business record by its unique ID.
 	GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error)
 	// GetBusinessCurrentPlan gets the details on the current plan

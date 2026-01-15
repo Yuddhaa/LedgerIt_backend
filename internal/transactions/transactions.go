@@ -33,6 +33,7 @@ func (h *Handler) Routes() chi.Router {
 	r.Get("/", h.GetTransactionsHandler)
 	r.Get("/{tran_id}", h.GetSingleTransactionsHandler)
 	r.Patch("/{tran_id}", h.UpdateTransactionHandler)
+	r.Delete("/{tran_id}", h.DeleteTransactionHandler)
 	// approvals related
 	r.Get("/approvals", h.GetApprovalsHandler)
 	r.Patch("/approvals/{approval_id}", h.PatchApprovalHandler)

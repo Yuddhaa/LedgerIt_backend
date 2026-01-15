@@ -118,6 +118,29 @@ func (q *Queries) DeleteBusinessMember(ctx context.Context, arg DeleteBusinessMe
 	return err
 }
 
+const deleteTransaction = `-- name: DeleteTransaction :one
+DELETE FROM transactions WHERE id=$1 AND business_id = $2 RETURNING user_id, amount, direction
+`
+
+type DeleteTransactionParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+type DeleteTransactionRow struct {
+	UserID    pgtype.UUID          `json:"user_id"`
+	Amount    pgtype.Numeric       `json:"amount"`
+	Direction TransactionDirection `json:"direction"`
+}
+
+// used to delete a transactions
+func (q *Queries) DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) (DeleteTransactionRow, error) {
+	row := q.db.QueryRow(ctx, deleteTransaction, arg.ID, arg.BusinessID)
+	var i DeleteTransactionRow
+	err := row.Scan(&i.UserID, &i.Amount, &i.Direction)
+	return i, err
+}
+
 const getBusinessByID = `-- name: GetBusinessByID :one
 SELECT b.id, b.name, b.owner_id, b.created_at, b.updated_at, b.current_plan_id, b.subscriptions_status, b.subscription_end_period, b.is_trial_used, b.current_subscription_id, b.is_offer_used,bm.user_id,bm.role,bm.current_balance 
 FROM businesses b
