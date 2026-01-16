@@ -67,8 +67,13 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogError("UpdateHandler", "business doesn't have a current plan", "businessId", businessId)
 		return
 	}
-	curBasePlan := strings.Split(curPlan.CurrentPlanID.String, "-")[1]
+	if curPlan.CurrentPlanID.String == configs.PERMANENT_PLAN_ID {
+		helpers.RespondWithError(w, http.StatusForbidden, "cannot update as current plan is 'owner'")
+		helpers.LogInfo("UpdateHandler", "cannot update as curplan is owner")
+		return
+	}
 
+	curBasePlan := strings.Split(curPlan.CurrentPlanID.String, "-")[1]
 	// check if the plans is a degrade
 	if configs.Plans[curBasePlan].Level > configs.Plans[body.BasePlan].Level {
 
@@ -100,9 +105,6 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// ****************************************************************************************************************
-	// now that we have the plan, create the subscription
-	// ****************************************************************************************************************
 	notes := map[string]any{
 		"type":                "update", // Tells Webhook: "This is a replacement!"
 		"user_id":             userId,
@@ -111,6 +113,16 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		"old_sub_razorpay_id": curPlan.RazorpaySubscriptionID,
 		"is_immediate":        body.IsImmediate,
 	}
+	// ****************************************************************************************************************
+	// if plan is "owner" branch of to create order (instead of subscription)
+	// ****************************************************************************************************************
+	if plan.ID == configs.PERMANENT_PLAN_ID {
+		h.createOrder(w, r.Context(), businessId, plan, notes)
+		return
+	}
+	// ****************************************************************************************************************
+	// else create the subscription
+	// ****************************************************************************************************************
 	var startAt *int64
 	if !body.IsImmediate && curPlan.SubscriptionEndPeriod.Valid {
 		temp := curPlan.SubscriptionEndPeriod.Time.Unix()

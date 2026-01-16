@@ -32,7 +32,7 @@ type Handler struct {
 
 var (
 	PERIOD    = []string{"monthly", "yearly", "permanent"}
-	BASEPLANS = []string{"solo", "retail", "wholesale", "enterprice"}
+	BASEPLANS = []string{"solo", "retail", "wholesale", "enterprice", "owner"}
 )
 
 // reqType is used by /create and /update as a type for the r.Body
@@ -48,9 +48,14 @@ type reqType struct {
 
 // resType is used by /create and /update as a type to send responses
 type resType struct {
-	ShortUrl       string      `json:"short_url"`
+	Type           string      `json:"type"`
 	SubscriptionId pgtype.UUID `json:"subscription_id"`
-	RazorpaySubId  string      `json:"razorpay_sub_id"`
+	RazorpayKey    string      `json:"razorpay_key"`
+	// for "owner"
+	RazorpayOrderId string `json:"razorpay_order_id,omitempty"`
+	// for rest of the plans
+	RazorpaySubId string `json:"razorpay_sub_id,omitempty"`
+	ShortUrl      string `json:"short_url,omitempty"`
 }
 
 func NewHandler(db *db.Queries, pool *pgxpool.Pool, rp_client *razorpay.Client) *Handler {
@@ -86,7 +91,7 @@ func validateRequestBody(w http.ResponseWriter, body reqType) bool {
 		helpers.LogInfo("validateRequestBody", "bad 'base_plan' in body")
 		return false
 	}
-	if body.Period == "permanent" && !(body.BasePlan == "solo") {
+	if body.Period == "permanent" && !(body.BasePlan == "solo" || body.BasePlan == "owner") {
 		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Request:period=permanent can only be used with solo")
 		helpers.LogInfo("validateRequestBody", "Bad Request:period=permanent can only be used with solo")
 		return false
@@ -103,6 +108,10 @@ func (h *Handler) getOrCreatePlan(w http.ResponseWriter, r *http.Request, body r
 	// if plan is solo, force the addon and period
 	if body.BasePlan == "solo" {
 		body.AddOn = "0"
+		body.Period = "permanent"
+	}
+	if body.BasePlan == "owner" {
+		body.AddOn = "99999"
 		body.Period = "permanent"
 	}
 	addOnInt, err := strconv.Atoi(body.AddOn)
@@ -214,7 +223,6 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 	if startAt != nil {
 		newSubscriptionData["start_at"] = *startAt
 	}
-	status := db.SubscriptionsStatusPending
 	newRazorpaySub, err := h.rp_client.Subscription.Create(newSubscriptionData, nil)
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
@@ -227,6 +235,7 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 		helpers.LogError("CreateHandler", "can't convert razorpaySubId to go string", "subscription id", newRazorpaySub["id"])
 		return resType{}, false
 	}
+	status := db.SubscriptionsStatusPending
 	// ****************************************************************************************************************
 	// create a new subscriptions row
 	createSubscriptionParams := db.CreateSubscriptionParams{
@@ -255,10 +264,59 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 		return resType{}, false
 	}
 	return resType{
-		ShortUrl:       shortUrl,
+		Type:           "subscription",
 		SubscriptionId: subscription.ID,
+		RazorpayKey:    configs.Configs.RAZORPAY_API_KEY,
+		ShortUrl:       shortUrl,
 		RazorpaySubId:  razorpaySubId,
 	}, true
+}
+
+// createPayment used in creating a one time payment for "owner" plan
+func (h *Handler) createOrder(w http.ResponseWriter, ctx context.Context, businessId pgtype.UUID, plan db.Plan, notes map[string]any) {
+	data := map[string]any{
+		"amount":          plan.Amount,
+		"currency":        "INR",
+		"partial_payment": false,
+		"notes":           notes,
+	}
+	order, err := h.rp_client.Order.Create(data, nil)
+	if err != nil {
+		helpers.RespondWithError(w, 500, "internal server error")
+		helpers.LogError("createOrder", "rp_client error in creating order", "err", err.Error())
+		return
+	}
+
+	status := db.SubscriptionsStatusPending
+	// ****************************************************************************************************************
+	// create a new subscriptions row
+	// here RazorpaySubscriptionID will be order id.
+	createSubscriptionParams := db.CreateSubscriptionParams{
+		BusinessID:             businessId,
+		PlanID:                 plan.ID,
+		RazorpaySubscriptionID: order["id"].(string),
+		Status:                 status,
+		MarketerID: pgtype.UUID{
+			Valid: false,
+		},
+		IsOfferApplied: false,
+	}
+	subscription, err := h.db.CreateSubscription(ctx, createSubscriptionParams)
+	if err != nil {
+		helpers.RespondWithError(w, 500, "internal server error")
+		helpers.LogError("CreateHandler", "db error in creating the subscription row", "err", err.Error())
+		return
+	}
+	// ****************************************************************************************************************
+	// response
+	res := resType{
+		Type:            "order",
+		SubscriptionId:  subscription.ID,
+		RazorpayKey:     configs.Configs.RAZORPAY_API_KEY,
+		RazorpayOrderId: order["id"].(string),
+	}
+	helpers.RespondWithJSON(w, 201, res)
+	helpers.LogInfo("createOrder", "res sent", "res", res)
 }
 
 // handleSoloPlan if the user is allowed a solo plan (i.e. if doesn't already have one solo business)

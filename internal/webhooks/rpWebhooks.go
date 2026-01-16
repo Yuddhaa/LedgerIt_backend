@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 
 	"LedgerIt/internal/db"
@@ -77,6 +78,8 @@ func (h *Handler) RazorpayWebhooks(w http.ResponseWriter, r *http.Request) {
 		handlerErr = h.handleSubscriptionPending(ctx, payload.Payload)
 	case "subscription.halted":
 		handlerErr = h.handleSubscriptionHalted(ctx, payload.Payload)
+	case "order.paid":
+		handlerErr = h.handleOrderPaid(ctx, payload.Payload)
 	}
 	if handlerErr != nil {
 		// CRITICAL FIX: Return 500 to trigger Razorpay Retry
@@ -275,6 +278,7 @@ func (h *Handler) handleSubscriptionCharged(ctx context.Context, payload map[str
 		IsTrialUsed:            pgtype.Bool{Bool: isTrial, Valid: true},
 	})
 	if err != nil {
+		helpers.LogInfo("handleSubscriptionCharged", "err in UpdateSubscriptionAndBusiness", "err", err.Error())
 		return err
 	}
 	helpers.LogInfo("Webhook", "Subscription Activated/Renewed", "sub_id", rzpSubID, "status", finalStatus, "reason", statusReason)
@@ -346,4 +350,135 @@ func (h *Handler) handleSubscriptionPending(ctx context.Context, payload map[str
 func (h *Handler) handleSubscriptionHalted(ctx context.Context, payload map[string]any) error {
 	// 'halted' maps to 'past_due'
 	return h.updateSubscriptionStateSafe(ctx, payload, db.SubscriptionsStatusPastDue, "subscription.halted")
+}
+
+func (h *Handler) handleOrderPaid(ctx context.Context, payload map[string]any) error {
+	// ****************************************************************************************************************
+	// 1. Extract Order & Payment Data
+	// ****************************************************************************************************************
+	// Safely extract nested maps. In webhooks, these are usually map[string]interface{}
+	paymentEntity, ok := payload["payment"].(map[string]any)["entity"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("handleOrderPaid: cannot extract payment entity")
+	}
+	orderEntity, ok := payload["order"].(map[string]any)["entity"].(map[string]any)
+	if !ok {
+		return fmt.Errorf("handleOrderPaid: cannot extract order entity")
+	}
+
+	// Extract IDs
+	paymentID, _ := paymentEntity["id"].(string)
+	orderID, _ := orderEntity["id"].(string)
+
+	// Razorpay sends amount in Paisa (float64 in JSON decoding usually)
+	tempAmount, _ := paymentEntity["amount"].(float64)
+	amountPaid := int64(tempAmount)
+
+	// Extract Notes (Crucial for linking to business/user)
+	notes, ok := orderEntity["notes"].(map[string]any)
+	if !ok {
+		helpers.LogInfo("Webhook", "handleOrderPaid ignored: no notes found", "order_id", orderID)
+		return nil // Ignore irrelevant orders
+	}
+	// ****************************************************************************************************************
+	// 3. Start DB Transaction
+	// ****************************************************************************************************************
+	tx, err := h.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	qtx := h.db.WithTx(tx)
+
+	// ****************************************************************************************************************
+	// 4. Get The Pending Subscription Row
+	// ****************************************************************************************************************
+	// In createOrder, we stored the 'order_id' in the 'razorpay_subscription_id' column.
+	// We fetch it to get the internal Primary Key (ID).
+	subRow, err := qtx.GetSubscriptionByRazorpayID(ctx, orderID)
+	if err != nil {
+		helpers.LogError("Webhook", "handleOrderPaid: Subscription lookup failed", "order_id", orderID, "err", err.Error())
+		return err
+	}
+
+	// ZOMBIE GUARD: If already Active, do not re-process
+	if subRow.Status == db.SubscriptionsStatusActive {
+		helpers.LogInfo("Webhook", "Order already processed", "order_id", orderID)
+		return nil
+	}
+
+	// ****************************************************************************************************************
+	// 5. Create Invoice (Record Keeping)
+	// ****************************************************************************************************************
+	_, err = qtx.CreateInvoice(ctx, db.CreateInvoiceParams{
+		SubscriptionID:    subRow.ID,
+		BusinessID:        subRow.BusinessID,
+		RazorpayPaymentID: paymentID,
+		AmountPaid:        amountPaid,
+		Currency:          pgtype.Text{String: "INR", Valid: true},
+		Status:            db.SubscriptionInvoicesStatusPaid,
+	})
+	if err != nil {
+		if helpers.IsUniqueViolation(err) {
+			helpers.LogInfo("Webhook", "Duplicate invoice creation ignored", "pay_id", paymentID)
+		} else {
+			helpers.LogError("Webhook", "Invoice creation failed", "err", err.Error())
+			return err
+		}
+	}
+
+	// ****************************************************************************************************************
+	// 6. Update Subscription & Business (Atomic Update)
+	// ****************************************************************************************************************
+	// Calculate Dates
+	startDate := time.Now()
+	expiryDate := time.Now().AddDate(100, 0, 0) // 100 Years
+
+	// We use orderID as RazorpaySubscriptionID because that is how we stored it in createOrder.
+	// This query will:
+	// 1. Update the 'subscriptions' row to Active and set dates.
+	// 2. Update the 'businesses' table to point to this subscription and sync the status/plan.
+	err = qtx.UpdateSubscriptionAndBusiness(ctx, db.UpdateSubscriptionAndBusinessParams{
+		RazorpaySubscriptionID: orderID,
+		Status:                 db.SubscriptionsStatusActive,
+		CurrentPeriodStart:     pgtype.Timestamptz{Time: startDate, Valid: true},
+		CurrentPeriodEnd:       pgtype.Timestamptz{Time: expiryDate, Valid: true},
+
+		// Passing Valid: false (NULL) results in "is_trial_used OR false" in your SQL.
+		// This preserves the existing value as requested.
+		IsTrialUsed: pgtype.Bool{Valid: false},
+	})
+	if err != nil {
+		helpers.LogError("Webhook", "handleOrderPaid: Failed to update subscription/business", "err", err.Error())
+		return err
+	}
+
+	helpers.LogInfo("Webhook", "One-Time Order Processed. Plan Activated.", "order_id", orderID)
+
+	// ****************************************************************************************************************
+	// 7. Cancel Old Subscription (Upgrade Path)
+	// ****************************************************************************************************************
+	// Check notes for "old_sub_razorpay_id" passed from UpdateHandler
+	// We cancel it IMMEDIATELY because the user has paid for the new Lifetime plan.
+	if typeVal, ok := notes["type"].(string); ok && typeVal == "update" {
+		oldSubID, _ := notes["old_sub_razorpay_id"].(string)
+
+		if oldSubID != "" {
+			// Using helper function logic here
+			// cancel_at_cycle_end = 0 (Immediate)
+			_, rpErr := h.rp_client.Subscription.Cancel(oldSubID, map[string]any{"cancel_at_cycle_end": 0}, nil)
+
+			if rpErr != nil {
+				// Ignore if already cancelled
+				if !strings.Contains(rpErr.Error(), "BAD_REQUEST_ERROR") && !strings.Contains(rpErr.Error(), "not in active state") {
+					helpers.LogError("Webhook", "Failed to cancel old recurring sub", "old_id", oldSubID, "err", rpErr.Error())
+				}
+			} else {
+				helpers.LogInfo("Webhook", "Old recurring subscription cancelled", "old_id", oldSubID)
+			}
+		}
+	}
+
+	// 8. Commit
+	return tx.Commit(ctx)
 }

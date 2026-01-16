@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"LedgerIt/internal/auth"
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 )
@@ -86,13 +87,20 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// ****************************************************************************************************************
-	// now that we have the plan, create the subscription
+	// if plan is "owner" branch of to create order (instead of subscription)
 	// ****************************************************************************************************************
 	notes := map[string]any{
 		"type":        "fresh", // Tells Webhook: "Don't look for old subs to cancel"
 		"user_id":     userId,
 		"business_id": businessId,
 	}
+	if plan.ID == configs.PERMANENT_PLAN_ID {
+		h.createOrder(w, r.Context(), businessId, plan, notes)
+		return
+	}
+	// ****************************************************************************************************************
+	// now that we have the plan, create the subscription
+	// ****************************************************************************************************************
 
 	// Start Immediately (startAt = nil)
 	res, ok := h.createSubscription(w, r, plan, notes, businessId, nil)

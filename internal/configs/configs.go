@@ -24,9 +24,11 @@ var Configs configType
 const (
 	MONTHLY_ADDON = 7900
 	YEARLY_ADDON  = 70800
+	PERMANENT     = 1499900
 	TRIAL_DAYS    = time.Duration(90 * 24 * time.Hour)
 	// TRIAL_DAYS   = time.Duration(time.Minute * 10)
-	FREE_PLAN_ID = "permanent-solo-0"
+	FREE_PLAN_ID      = "permanent-solo-0"
+	PERMANENT_PLAN_ID = "permanent-owner-99999"
 )
 
 // PlanStruct is type for individual plan information
@@ -43,6 +45,7 @@ var Plans = map[string]PlanStruct{
 	"retail":     {Level: 2, MonthlyBasePrice: 14900, YearlyBasePrice: 118800, UsersLimit: 3},
 	"wholesale":  {Level: 3, MonthlyBasePrice: 47900, YearlyBasePrice: 388800, UsersLimit: 8},
 	"enterprice": {Level: 4, MonthlyBasePrice: 97400, YearlyBasePrice: 838800, UsersLimit: 15},
+	"owner":      {Level: 5, MonthlyBasePrice: PERMANENT, YearlyBasePrice: PERMANENT, UsersLimit: 99999},
 }
 
 func LoadConfig() error {
