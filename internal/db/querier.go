@@ -13,6 +13,7 @@ import (
 type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
+	AddMarketerCommission(ctx context.Context, arg AddMarketerCommissionParams) error
 	CancelSubscription(ctx context.Context, razorpaySubscriptionID string) error
 	// returns 1 if a user is admin or creator of a given business_id
 	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
@@ -62,10 +63,15 @@ type Querier interface {
 	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
 	// get a particular category
 	GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error)
+	GetMarketerById(ctx context.Context, id pgtype.UUID) (Marketer, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
 	// used to get a member details
 	GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error)
+	// ********************************************************************************************************************
+	// offers related
+	// ********************************************************************************************************************
+	GetOfferDetailsByCode(ctx context.Context, code string) (GetOfferDetailsByCodeRow, error)
 	// get a particular party
 	GetParty(ctx context.Context, arg GetPartyParams) (Party, error)
 	// GetPlan query gets plan based on the planId
@@ -117,7 +123,6 @@ type Querier interface {
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
 	UpdateStatusIfPending(ctx context.Context, arg UpdateStatusIfPendingParams) error
-	// If 'is_trial_used' is already true, keep it true.
 	UpdateSubscriptionAndBusiness(ctx context.Context, arg UpdateSubscriptionAndBusinessParams) error
 	// Used for simple state changes like Paused, Resumed, Pending, Halted
 	UpdateSubscriptionStatusRaw(ctx context.Context, arg UpdateSubscriptionStatusRawParams) error

@@ -11,6 +11,25 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+const addMarketerCommission = `-- name: AddMarketerCommission :exec
+UPDATE marketers
+SET 
+    commission_balance = commission_balance + $2,
+    total_commission = total_commission + $2,
+    updated_at = now()
+WHERE id = $1
+`
+
+type AddMarketerCommissionParams struct {
+	ID     pgtype.UUID `json:"id"`
+	Amount int64       `json:"amount"`
+}
+
+func (q *Queries) AddMarketerCommission(ctx context.Context, arg AddMarketerCommissionParams) error {
+	_, err := q.db.Exec(ctx, addMarketerCommission, arg.ID, arg.Amount)
+	return err
+}
+
 const cancelSubscription = `-- name: CancelSubscription :exec
 WITH updated_sub AS (
     UPDATE subscriptions
@@ -27,7 +46,7 @@ SET
     current_subscription_id = NULL -- Unlink the cancelled sub
 FROM updated_sub
 WHERE businesses.id = updated_sub.business_id
-  -- 🛑 SAFETY: Only cancel business status if this was the CURRENT active subscription
+  -- SAFETY: Only cancel business status if this was the CURRENT active subscription
   AND businesses.current_subscription_id = updated_sub.id
 `
 
@@ -66,7 +85,9 @@ INSERT INTO subscription_invoices (
   subscription_id, business_id, razorpay_payment_id, amount_paid, currency, status
 ) VALUES (
   $1, $2, $3, $4, $5, $6
-) RETURNING id
+)
+ON CONFLICT DO NOTHING 
+RETURNING id
 `
 
 type CreateInvoiceParams struct {
@@ -217,11 +238,12 @@ SELECT
     b.subscriptions_status,
     b.subscription_end_period,
     b.is_trial_used,
+    b.offer_code,
     
     -- Fetch directly from the joined subscription table
     s.id AS subscription_id,
     s.razorpay_subscription_id,
-    
+    s.marketer_id,    
     (
         SELECT COUNT(*)::INT 
         FROM business_members bm 
@@ -241,8 +263,10 @@ type GetBusinessCurrentPlanRow struct {
 	SubscriptionsStatus    SubscriptionsStatus `json:"subscriptions_status"`
 	SubscriptionEndPeriod  pgtype.Timestamptz  `json:"subscription_end_period"`
 	IsTrialUsed            bool                `json:"is_trial_used"`
+	OfferCode              pgtype.Text         `json:"offer_code"`
 	SubscriptionID         pgtype.UUID         `json:"subscription_id"`
 	RazorpaySubscriptionID pgtype.Text         `json:"razorpay_subscription_id"`
+	MarketerID             pgtype.UUID         `json:"marketer_id"`
 	MembersCount           int32               `json:"members_count"`
 }
 
@@ -258,10 +282,70 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 		&i.SubscriptionsStatus,
 		&i.SubscriptionEndPeriod,
 		&i.IsTrialUsed,
+		&i.OfferCode,
 		&i.SubscriptionID,
 		&i.RazorpaySubscriptionID,
+		&i.MarketerID,
 		&i.MembersCount,
 	)
+	return i, err
+}
+
+const getMarketerById = `-- name: GetMarketerById :one
+SELECT id, name, email, password_hash, offer_code_upi, razorpay_offer_id_upi, offer_code_card, razorpay_offer_id_card, offer_code_life, razorpay_offer_id_life, commission_percent, commission_balance, total_commission, created_at, updated_at FROM marketers WHERE id = $1
+`
+
+func (q *Queries) GetMarketerById(ctx context.Context, id pgtype.UUID) (Marketer, error) {
+	row := q.db.QueryRow(ctx, getMarketerById, id)
+	var i Marketer
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Email,
+		&i.PasswordHash,
+		&i.OfferCodeUpi,
+		&i.RazorpayOfferIDUpi,
+		&i.OfferCodeCard,
+		&i.RazorpayOfferIDCard,
+		&i.OfferCodeLife,
+		&i.RazorpayOfferIDLife,
+		&i.CommissionPercent,
+		&i.CommissionBalance,
+		&i.TotalCommission,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getOfferDetailsByCode = `-- name: GetOfferDetailsByCode :one
+SELECT 
+    id, 
+    commission_percent,
+    CASE 
+        WHEN offer_code_upi  = $1 THEN razorpay_offer_id_upi
+        WHEN offer_code_card = $1 THEN razorpay_offer_id_card
+        WHEN offer_code_life = $1 THEN razorpay_offer_id_life
+    END::text AS razorpay_offer_id
+FROM marketers
+WHERE offer_code_upi = $1 
+   OR offer_code_card = $1 
+   OR offer_code_life = $1
+`
+
+type GetOfferDetailsByCodeRow struct {
+	ID                pgtype.UUID `json:"id"`
+	CommissionPercent int32       `json:"commission_percent"`
+	RazorpayOfferID   string      `json:"razorpay_offer_id"`
+}
+
+// ********************************************************************************************************************
+// offers related
+// ********************************************************************************************************************
+func (q *Queries) GetOfferDetailsByCode(ctx context.Context, code string) (GetOfferDetailsByCodeRow, error) {
+	row := q.db.QueryRow(ctx, getOfferDetailsByCode, code)
+	var i GetOfferDetailsByCodeRow
+	err := row.Scan(&i.ID, &i.CommissionPercent, &i.RazorpayOfferID)
 	return i, err
 }
 
@@ -342,7 +426,7 @@ SET
     current_subscription_id = $5,
     updated_at = now()
 WHERE id = $1
-RETURNING id, name, owner_id, created_at, updated_at, current_plan_id, subscriptions_status, subscription_end_period, is_trial_used, current_subscription_id, is_offer_used
+RETURNING id, name, owner_id, created_at, updated_at, current_plan_id, subscriptions_status, subscription_end_period, is_trial_used, current_subscription_id, is_offer_used, offer_code
 `
 
 type UpdateBusinessSubscriptionParams struct {
@@ -379,6 +463,7 @@ func (q *Queries) UpdateBusinessSubscription(ctx context.Context, arg UpdateBusi
 		&i.IsTrialUsed,
 		&i.CurrentSubscriptionID,
 		&i.IsOfferUsed,
+		&i.OfferCode,
 	)
 	return i, err
 }
@@ -433,7 +518,7 @@ WITH updated_sub AS (
         current_period_end = $4,
         updated_at = now()
     WHERE razorpay_subscription_id = $1
-    RETURNING id, business_id, status, current_period_end, plan_id
+    RETURNING id, business_id, status, current_period_end, plan_id, is_offer_applied
 )
 UPDATE businesses
 SET 
@@ -441,9 +526,16 @@ SET
     subscriptions_status = updated_sub.status,
     subscription_end_period = updated_sub.current_period_end,
     current_subscription_id = updated_sub.id,
-    -- If $5 input is true, make it true.
-    -- Only if BOTH are false does it stay false.
-    is_trial_used = (is_trial_used OR COALESCE($5::boolean, false))
+    
+    -- Trial Logic
+    is_trial_used = (is_trial_used OR COALESCE($5::boolean, false)),
+    
+    -- Offer Logic
+    is_offer_used = (is_offer_used OR updated_sub.is_offer_applied),
+    
+    -- Use narg. If input is NULL, COALESCE keeps the old value.
+    offer_code = COALESCE($6::text, offer_code)
+
 FROM updated_sub
 WHERE businesses.id = updated_sub.business_id
 `
@@ -454,9 +546,9 @@ type UpdateSubscriptionAndBusinessParams struct {
 	CurrentPeriodStart     pgtype.Timestamptz  `json:"current_period_start"`
 	CurrentPeriodEnd       pgtype.Timestamptz  `json:"current_period_end"`
 	IsTrialUsed            pgtype.Bool         `json:"is_trial_used"`
+	OfferCode              pgtype.Text         `json:"offer_code"`
 }
 
-// If 'is_trial_used' is already true, keep it true.
 func (q *Queries) UpdateSubscriptionAndBusiness(ctx context.Context, arg UpdateSubscriptionAndBusinessParams) error {
 	_, err := q.db.Exec(ctx, updateSubscriptionAndBusiness,
 		arg.RazorpaySubscriptionID,
@@ -464,6 +556,7 @@ func (q *Queries) UpdateSubscriptionAndBusiness(ctx context.Context, arg UpdateS
 		arg.CurrentPeriodStart,
 		arg.CurrentPeriodEnd,
 		arg.IsTrialUsed,
+		arg.OfferCode,
 	)
 	return err
 }

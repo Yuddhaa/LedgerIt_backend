@@ -204,8 +204,8 @@ func (h *Handler) getOrCreatePlan(w http.ResponseWriter, r *http.Request, body r
 	return plan, true
 }
 
-func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
-	plan db.Plan, notes map[string]any, businessId pgtype.UUID, startAt *int64,
+func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request, plan db.Plan, notes map[string]any,
+	businessId pgtype.UUID, startAt *int64, rpOfferId string, marketerId pgtype.UUID,
 ) (resType, bool) {
 	var totalCount int
 	switch plan.Period {
@@ -219,6 +219,9 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 		"total_count":     totalCount,
 		"customer_notify": 1,
 		"notes":           notes,
+	}
+	if rpOfferId != "" {
+		newSubscriptionData["offer_id"] = rpOfferId
 	}
 	if startAt != nil {
 		newSubscriptionData["start_at"] = *startAt
@@ -243,10 +246,8 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 		PlanID:                 plan.ID,
 		RazorpaySubscriptionID: razorpaySubId,
 		Status:                 status,
-		MarketerID: pgtype.UUID{
-			Valid: false,
-		},
-		IsOfferApplied: false,
+		MarketerID:             marketerId,
+		IsOfferApplied:         rpOfferId != "",
 	}
 	subscription, err := h.db.CreateSubscription(r.Context(), createSubscriptionParams)
 	if err != nil {
@@ -273,12 +274,17 @@ func (h *Handler) createSubscription(w http.ResponseWriter, r *http.Request,
 }
 
 // createPayment used in creating a one time payment for "owner" plan
-func (h *Handler) createOrder(w http.ResponseWriter, ctx context.Context, businessId pgtype.UUID, plan db.Plan, notes map[string]any) {
+func (h *Handler) createOrder(w http.ResponseWriter, ctx context.Context, businessId pgtype.UUID,
+	plan db.Plan, notes map[string]any, rpOfferId string, marketerId pgtype.UUID,
+) {
 	data := map[string]any{
 		"amount":          plan.Amount,
 		"currency":        "INR",
 		"partial_payment": false,
 		"notes":           notes,
+	}
+	if rpOfferId != "" {
+		data["offer_id"] = rpOfferId
 	}
 	order, err := h.rp_client.Order.Create(data, nil)
 	if err != nil {
@@ -296,10 +302,8 @@ func (h *Handler) createOrder(w http.ResponseWriter, ctx context.Context, busine
 		PlanID:                 plan.ID,
 		RazorpaySubscriptionID: order["id"].(string),
 		Status:                 status,
-		MarketerID: pgtype.UUID{
-			Valid: false,
-		},
-		IsOfferApplied: false,
+		MarketerID:             marketerId,
+		IsOfferApplied:         rpOfferId != "",
 	}
 	subscription, err := h.db.CreateSubscription(ctx, createSubscriptionParams)
 	if err != nil {

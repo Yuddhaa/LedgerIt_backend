@@ -459,6 +459,7 @@ type Business struct {
 	IsTrialUsed           bool                `json:"is_trial_used"`
 	CurrentSubscriptionID pgtype.UUID         `json:"current_subscription_id"`
 	IsOfferUsed           bool                `json:"is_offer_used"`
+	OfferCode             pgtype.Text         `json:"offer_code"`
 }
 
 type BusinessMember struct {
@@ -483,19 +484,21 @@ type Deposit struct {
 }
 
 type Marketer struct {
-	ID                pgtype.UUID        `json:"id"`
-	Name              string             `json:"name"`
-	Email             string             `json:"email"`
-	PasswordHash      string             `json:"password_hash"`
-	UpiOfferCode      string             `json:"upi_offer_code"`
-	UpiRazorpayID     string             `json:"upi_razorpay_id"`
-	CardOfferCode     string             `json:"card_offer_code"`
-	CardRazorpayID    string             `json:"card_razorpay_id"`
-	CommissionPercent int32              `json:"commission_percent"`
-	CommissionBalance int64              `json:"commission_balance"`
-	TotalCommission   int64              `json:"total_commission"`
-	CreatedAt         pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt         pgtype.Timestamptz `json:"updated_at"`
+	ID                  pgtype.UUID        `json:"id"`
+	Name                string             `json:"name"`
+	Email               string             `json:"email"`
+	PasswordHash        string             `json:"password_hash"`
+	OfferCodeUpi        string             `json:"offer_code_upi"`
+	RazorpayOfferIDUpi  string             `json:"razorpay_offer_id_upi"`
+	OfferCodeCard       string             `json:"offer_code_card"`
+	RazorpayOfferIDCard string             `json:"razorpay_offer_id_card"`
+	OfferCodeLife       string             `json:"offer_code_life"`
+	RazorpayOfferIDLife string             `json:"razorpay_offer_id_life"`
+	CommissionPercent   int32              `json:"commission_percent"`
+	CommissionBalance   int64              `json:"commission_balance"`
+	TotalCommission     int64              `json:"total_commission"`
+	CreatedAt           pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt           pgtype.Timestamptz `json:"updated_at"`
 }
 
 type MarketerPayout struct {

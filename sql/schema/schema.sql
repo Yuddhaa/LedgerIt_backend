@@ -183,10 +183,12 @@ CREATE TABLE marketers (
   email TEXT UNIQUE NOT NULL,
   password_hash TEXT NOT NULL,
 
-  upi_offer_code TEXT UNIQUE NOT NULL,
-  upi_razorpay_id TEXT UNIQUE NOT NULL,
-  card_offer_code TEXT UNIQUE NOT NULL,
-  card_razorpay_id TEXT UNIQUE NOT NULL,
+  offer_code_upi TEXT UNIQUE NOT NULL,
+  razorpay_offer_id_upi TEXT NOT NULL,
+  offer_code_card TEXT UNIQUE NOT NULL,
+  razorpay_offer_id_card TEXT NOT NULL,
+  offer_code_life TEXT UNIQUE NOT NULL,
+  razorpay_offer_id_life TEXT NOT NULL,
 
   commission_percent INT NOT NULL CHECK (commission_percent BETWEEN 0 AND 40),
   commission_balance BIGINT NOT NULL DEFAULT 0, 
@@ -272,7 +274,8 @@ ADD COLUMN subscriptions_status subscriptions_status NOT NULL DEFAULT 'inactive'
 ADD COLUMN subscription_end_period TIMESTAMPTZ,
 ADD COLUMN is_trial_used BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN current_subscription_id UUID REFERENCES subscriptions(id) ON DELETE SET NULL,
-ADD COLUMN is_offer_used BOOLEAN NOT NULL DEFAULT false;
+ADD COLUMN is_offer_used BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN offer_code TEXT;
 
 --- funcitons ---
 

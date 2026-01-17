@@ -20,11 +20,12 @@ SELECT
     b.subscriptions_status,
     b.subscription_end_period,
     b.is_trial_used,
+    b.offer_code,
     
     -- Fetch directly from the joined subscription table
     s.id AS subscription_id,
     s.razorpay_subscription_id,
-    
+    s.marketer_id,    
     (
         SELECT COUNT(*)::INT 
         FROM business_members bm 
@@ -101,7 +102,9 @@ INSERT INTO subscription_invoices (
   subscription_id, business_id, razorpay_payment_id, amount_paid, currency, status
 ) VALUES (
   $1, $2, $3, $4, $5, $6
-) RETURNING id;
+)
+ON CONFLICT DO NOTHING 
+RETURNING id;
 
 -- Query to find subscription by Razorpay ID (Critical for Webhooks)
 -- name: GetSubscriptionByRazorpayID :one
@@ -116,7 +119,7 @@ WITH updated_sub AS (
         current_period_end = $4,
         updated_at = now()
     WHERE razorpay_subscription_id = $1
-    RETURNING id, business_id, status, current_period_end, plan_id
+    RETURNING id, business_id, status, current_period_end, plan_id, is_offer_applied
 )
 UPDATE businesses
 SET 
@@ -124,13 +127,18 @@ SET
     subscriptions_status = updated_sub.status,
     subscription_end_period = updated_sub.current_period_end,
     current_subscription_id = updated_sub.id,
--- If 'is_trial_used' is already true, keep it true.
-    -- If $5 input is true, make it true.
-    -- Only if BOTH are false does it stay false.
-    is_trial_used = (is_trial_used OR COALESCE(sqlc.narg('is_trial_used')::boolean, false))
+    
+    -- Trial Logic
+    is_trial_used = (is_trial_used OR COALESCE(sqlc.narg('is_trial_used')::boolean, false)),
+    
+    -- Offer Logic
+    is_offer_used = (is_offer_used OR updated_sub.is_offer_applied),
+    
+    -- Use narg. If input is NULL, COALESCE keeps the old value.
+    offer_code = COALESCE(sqlc.narg('offer_code')::text, offer_code)
+
 FROM updated_sub
 WHERE businesses.id = updated_sub.business_id;
-
 -- name: UpdateStatusIfPending :exec
 WITH updated_sub AS (
     UPDATE subscriptions
@@ -186,9 +194,40 @@ SET
     current_subscription_id = NULL -- Unlink the cancelled sub
 FROM updated_sub
 WHERE businesses.id = updated_sub.business_id
-  -- 🛑 SAFETY: Only cancel business status if this was the CURRENT active subscription
+  -- SAFETY: Only cancel business status if this was the CURRENT active subscription
   AND businesses.current_subscription_id = updated_sub.id;
 
 -- name: GetSubscriptionStatus :one
 SELECT status FROM subscriptions WHERE business_id = $1 AND id = $2;
 
+
+
+-- ********************************************************************************************************************
+-- offers related
+-- ********************************************************************************************************************
+-- name: GetOfferDetailsByCode :one
+SELECT 
+    id, 
+    commission_percent,
+    CASE 
+        WHEN offer_code_upi  = sqlc.arg(code) THEN razorpay_offer_id_upi
+        WHEN offer_code_card = sqlc.arg(code) THEN razorpay_offer_id_card
+        WHEN offer_code_life = sqlc.arg(code) THEN razorpay_offer_id_life
+    END::text AS razorpay_offer_id
+FROM marketers
+WHERE offer_code_upi = sqlc.arg(code) 
+   OR offer_code_card = sqlc.arg(code) 
+   OR offer_code_life = sqlc.arg(code);
+
+-- name: AddMarketerCommission :exec
+UPDATE marketers
+SET 
+    commission_balance = commission_balance + sqlc.arg(amount),
+    total_commission = total_commission + sqlc.arg(amount),
+    updated_at = now()
+WHERE id = $1;
+
+-- name: GetMarketerById :one
+SELECT * FROM marketers WHERE id = $1;
+-- -- name: GetMarketerByCode :one
+-- SELECT * FROM marketers WHERE offer_code_upi = $1 OR offer_code_card = $1 OR offer_code_life = $1;

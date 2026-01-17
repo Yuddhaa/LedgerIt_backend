@@ -2,12 +2,17 @@ package subscriptions
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 // CreateHandler creates a plan(if not exists) and
@@ -86,24 +91,51 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+
+	// ****************************************************************************************************************
+	// get offerid if body offercode exists
+	// ****************************************************************************************************************
+	rpOfferId := ""
+	var marketerId pgtype.UUID
+	if body.OfferCode != "" {
+		offerRow, err := h.db.GetOfferDetailsByCode(r.Context(), body.OfferCode)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				helpers.RespondWithError(w, http.StatusNotFound, fmt.Sprintf("offerid does not exist for offercode: %s", body.OfferCode))
+				helpers.LogInfo("CreateHandler", fmt.Sprintf("offerid does not exist for offercode: %s", body.OfferCode))
+				return
+			}
+			helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+			helpers.LogInfo("CreateHandler", "error in GetRpOfferId", "err", err.Error())
+			return
+		}
+		rpOfferId = offerRow.RazorpayOfferID
+		marketerId = offerRow.ID
+	}
 	// ****************************************************************************************************************
 	// if plan is "owner" branch of to create order (instead of subscription)
 	// ****************************************************************************************************************
 	notes := map[string]any{
-		"type":        "fresh", // Tells Webhook: "Don't look for old subs to cancel"
-		"user_id":     userId,
-		"business_id": businessId,
+		"type":              "fresh", // Tells Webhook: "Don't look for old subs to cancel"
+		"user_id":           userId,
+		"business_id":       businessId,
+		"offer_code":        body.OfferCode,
+		"razorpay_offer_id": rpOfferId,
 	}
 	if plan.ID == configs.PERMANENT_PLAN_ID {
-		h.createOrder(w, r.Context(), businessId, plan, notes)
+		h.createOrder(w, r.Context(), businessId, plan, notes, rpOfferId, marketerId)
 		return
 	}
 	// ****************************************************************************************************************
 	// now that we have the plan, create the subscription
 	// ****************************************************************************************************************
+	helpers.LogInfo("CreateHandler", "", "rpOfferId", rpOfferId)
 
 	// Start Immediately (startAt = nil)
-	res, ok := h.createSubscription(w, r, plan, notes, businessId, nil)
+	res, ok := h.createSubscription(w, r, plan, notes, businessId, nil, rpOfferId, marketerId)
+	if !ok {
+		return
+	}
 	helpers.RespondWithJSON(w, 201, res)
 	helpers.LogInfo("CreateHandler", "subscription created", "res", res)
 }

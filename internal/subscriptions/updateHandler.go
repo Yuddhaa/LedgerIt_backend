@@ -112,12 +112,14 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		"old_sub_id":          curPlan.SubscriptionID,
 		"old_sub_razorpay_id": curPlan.RazorpaySubscriptionID,
 		"is_immediate":        body.IsImmediate,
+		"offer_code":          curPlan.OfferCode,
 	}
+	helpers.LogInfo("UpdateHandler", "offerCode", "offerCode", curPlan.OfferCode)
 	// ****************************************************************************************************************
 	// if plan is "owner" branch of to create order (instead of subscription)
 	// ****************************************************************************************************************
 	if plan.ID == configs.PERMANENT_PLAN_ID {
-		h.createOrder(w, r.Context(), businessId, plan, notes)
+		h.createOrder(w, r.Context(), businessId, plan, notes, "", curPlan.MarketerID)
 		return
 	}
 	// ****************************************************************************************************************
@@ -128,7 +130,7 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		temp := curPlan.SubscriptionEndPeriod.Time.Unix()
 		startAt = &temp
 	}
-	res, ok := h.createSubscription(w, r, plan, notes, businessId, startAt)
+	res, ok := h.createSubscription(w, r, plan, notes, businessId, startAt, "", curPlan.MarketerID)
 	helpers.RespondWithJSON(w, 201, res)
 	helpers.LogInfo("UpdateHandler", "subscription created", "res", res)
 }
