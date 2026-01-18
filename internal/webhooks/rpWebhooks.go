@@ -350,8 +350,6 @@ func (h *Handler) handleSubscriptionCancelled(ctx context.Context, payload map[s
 		return err
 	}
 
-	helpers.LogInfo("Webhook", "Processing Cancellation", "id", rzpSubID)
-
 	// atomic update that safely unlinks the subscription
 	err = h.db.CancelSubscription(ctx, rzpSubID)
 	if err != nil {

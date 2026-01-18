@@ -20,6 +20,7 @@ SELECT
     b.subscriptions_status,
     b.subscription_end_period,
     b.is_trial_used,
+    b.is_offer_used,
     b.offer_code,
     
     -- Fetch directly from the joined subscription table

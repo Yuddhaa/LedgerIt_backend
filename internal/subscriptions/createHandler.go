@@ -77,6 +77,16 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	// ****************************************************************************************************************
+	// check if the offer is already used if offercode has been passed in the body
+	// ****************************************************************************************************************
+	if body.OfferCode != "" {
+		if curPlan.IsOfferUsed {
+			helpers.RespondWithError(w, http.StatusConflict, "offer has already been used")
+			helpers.LogError("CreateHandler", "offer has already been used", "businessId", businessId)
+			return
+		}
+	}
+	// ****************************************************************************************************************
 	// check if either solo or trial available before moving forward if thats what the user has clicked
 	// ****************************************************************************************************************
 	if body.BasePlan == "solo" {
@@ -112,6 +122,7 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 		rpOfferId = offerRow.RazorpayOfferID
 		marketerId = offerRow.ID
 	}
+
 	// ****************************************************************************************************************
 	// if plan is "owner" branch of to create order (instead of subscription)
 	// ****************************************************************************************************************
@@ -129,8 +140,6 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	// ****************************************************************************************************************
 	// now that we have the plan, create the subscription
 	// ****************************************************************************************************************
-	helpers.LogInfo("CreateHandler", "", "rpOfferId", rpOfferId)
-
 	// Start Immediately (startAt = nil)
 	res, ok := h.createSubscription(w, r, plan, notes, businessId, nil, rpOfferId, marketerId)
 	if !ok {

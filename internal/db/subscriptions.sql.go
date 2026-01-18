@@ -238,6 +238,7 @@ SELECT
     b.subscriptions_status,
     b.subscription_end_period,
     b.is_trial_used,
+    b.is_offer_used,
     b.offer_code,
     
     -- Fetch directly from the joined subscription table
@@ -263,6 +264,7 @@ type GetBusinessCurrentPlanRow struct {
 	SubscriptionsStatus    SubscriptionsStatus `json:"subscriptions_status"`
 	SubscriptionEndPeriod  pgtype.Timestamptz  `json:"subscription_end_period"`
 	IsTrialUsed            bool                `json:"is_trial_used"`
+	IsOfferUsed            bool                `json:"is_offer_used"`
 	OfferCode              pgtype.Text         `json:"offer_code"`
 	SubscriptionID         pgtype.UUID         `json:"subscription_id"`
 	RazorpaySubscriptionID pgtype.Text         `json:"razorpay_subscription_id"`
@@ -282,6 +284,7 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 		&i.SubscriptionsStatus,
 		&i.SubscriptionEndPeriod,
 		&i.IsTrialUsed,
+		&i.IsOfferUsed,
 		&i.OfferCode,
 		&i.SubscriptionID,
 		&i.RazorpaySubscriptionID,
