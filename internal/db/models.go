@@ -494,6 +494,7 @@ type Marketer struct {
 	RazorpayOfferIDCard string             `json:"razorpay_offer_id_card"`
 	OfferCodeLife       string             `json:"offer_code_life"`
 	RazorpayOfferIDLife string             `json:"razorpay_offer_id_life"`
+	DiscountPercent     int32              `json:"discount_percent"`
 	CommissionPercent   int32              `json:"commission_percent"`
 	CommissionBalance   int64              `json:"commission_balance"`
 	TotalCommission     int64              `json:"total_commission"`

@@ -209,6 +209,7 @@ SELECT status FROM subscriptions WHERE business_id = $1 AND id = $2;
 SELECT 
     id, 
     commission_percent,
+    discount_percent,
     CASE 
         WHEN offer_code_upi  = sqlc.arg(code) THEN razorpay_offer_id_upi
         WHEN offer_code_card = sqlc.arg(code) THEN razorpay_offer_id_card
@@ -229,5 +230,3 @@ WHERE id = $1;
 
 -- name: GetMarketerById :one
 SELECT * FROM marketers WHERE id = $1;
--- -- name: GetMarketerByCode :one
--- SELECT * FROM marketers WHERE offer_code_upi = $1 OR offer_code_card = $1 OR offer_code_life = $1;

@@ -292,7 +292,7 @@ func (q *Queries) GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (G
 }
 
 const getMarketerById = `-- name: GetMarketerById :one
-SELECT id, name, email, password_hash, offer_code_upi, razorpay_offer_id_upi, offer_code_card, razorpay_offer_id_card, offer_code_life, razorpay_offer_id_life, commission_percent, commission_balance, total_commission, created_at, updated_at FROM marketers WHERE id = $1
+SELECT id, name, email, password_hash, offer_code_upi, razorpay_offer_id_upi, offer_code_card, razorpay_offer_id_card, offer_code_life, razorpay_offer_id_life, discount_percent, commission_percent, commission_balance, total_commission, created_at, updated_at FROM marketers WHERE id = $1
 `
 
 func (q *Queries) GetMarketerById(ctx context.Context, id pgtype.UUID) (Marketer, error) {
@@ -309,6 +309,7 @@ func (q *Queries) GetMarketerById(ctx context.Context, id pgtype.UUID) (Marketer
 		&i.RazorpayOfferIDCard,
 		&i.OfferCodeLife,
 		&i.RazorpayOfferIDLife,
+		&i.DiscountPercent,
 		&i.CommissionPercent,
 		&i.CommissionBalance,
 		&i.TotalCommission,
@@ -322,6 +323,7 @@ const getOfferDetailsByCode = `-- name: GetOfferDetailsByCode :one
 SELECT 
     id, 
     commission_percent,
+    discount_percent,
     CASE 
         WHEN offer_code_upi  = $1 THEN razorpay_offer_id_upi
         WHEN offer_code_card = $1 THEN razorpay_offer_id_card
@@ -336,6 +338,7 @@ WHERE offer_code_upi = $1
 type GetOfferDetailsByCodeRow struct {
 	ID                pgtype.UUID `json:"id"`
 	CommissionPercent int32       `json:"commission_percent"`
+	DiscountPercent   int32       `json:"discount_percent"`
 	RazorpayOfferID   string      `json:"razorpay_offer_id"`
 }
 
@@ -345,7 +348,12 @@ type GetOfferDetailsByCodeRow struct {
 func (q *Queries) GetOfferDetailsByCode(ctx context.Context, code string) (GetOfferDetailsByCodeRow, error) {
 	row := q.db.QueryRow(ctx, getOfferDetailsByCode, code)
 	var i GetOfferDetailsByCodeRow
-	err := row.Scan(&i.ID, &i.CommissionPercent, &i.RazorpayOfferID)
+	err := row.Scan(
+		&i.ID,
+		&i.CommissionPercent,
+		&i.DiscountPercent,
+		&i.RazorpayOfferID,
+	)
 	return i, err
 }
 

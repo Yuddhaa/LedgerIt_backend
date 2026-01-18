@@ -12,7 +12,18 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
+	if ok := h.getPlans(w, r, configs.MONTHLY_ADDON, configs.YEARLY_ADDON, configs.Plans); !ok {
+		return
+	}
+	helpers.LogInfo("GetPlansHandler", "plans sent")
+}
+
+// getPlans is a helper func which is used by get /plans and post /validate
+// this will return the whole current and available plans+subscripiton detail of the business
+func (h Handler) getPlans(w http.ResponseWriter, r *http.Request, monthlyAddon, yearlyAddon int,
+	plans map[string]configs.PlanStruct,
+) bool {
 	// 1. Define JSON Response Structures
 	// We use pointers (*string, *int64) so that if the DB value is NULL,
 	// the JSON output will be "null" instead of empty string "" or 0.
@@ -43,41 +54,41 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 	// 2. Auth & Context
 	userId, ok := auth.GetUserIdFromContext(w, r)
 	if !ok {
-		return
+		return false
 	}
 	businessId, ok := auth.ExtractUUID(w, r, "id")
 	if !ok {
-		return
+		return false
 	}
 
 	// 3. Check Eligibility
-	planEligibility, err := s.db.CheckUserPlanEligibility(r.Context(), userId)
+	planEligibility, err := h.db.CheckUserPlanEligibility(r.Context(), userId)
 	if err != nil {
 		helpers.RespondWithError(w, 500, "internal server error")
-		helpers.LogError("GetPlansHandler", "db error in CheckUserPlanEligibility", "err", err.Error())
-		return
+		helpers.LogError("getPlans", "db error in CheckUserPlanEligibility", "err", err.Error())
+		return false
 	}
 
 	// 4. Fetch Current Plan Data
-	dbPlan, err := s.db.GetBusinessCurrentPlan(r.Context(), businessId)
+	dbPlan, err := h.db.GetBusinessCurrentPlan(r.Context(), businessId)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			helpers.RespondWithError(w, http.StatusNotFound, "Business not found")
-			helpers.LogInfo("GetPlansHandler", "Business not found", "businessId", businessId)
-			return
+			helpers.LogInfo("getPlans", "Business not found", "businessId", businessId)
+			return false
 		}
 		helpers.RespondWithError(w, 500, "internal server error")
-		helpers.LogError("GetPlansHandler", "db error fetching plan", "err", err.Error())
-		return
+		helpers.LogError("getPlans", "db error fetching plan", "err", err.Error())
+		return false
 	}
 
 	// 5. Construct Base Response
 	res := resType{
 		IsFreeAvailable:  planEligibility.FreeAvailable,
 		IsTrialAvailable: planEligibility.TrialAvailable,
-		MonthlyAddon:     configs.MONTHLY_ADDON,
-		YearlyAddon:      configs.YEARLY_ADDON,
-		Plans:            configs.Plans,
+		MonthlyAddon:     monthlyAddon,
+		YearlyAddon:      yearlyAddon,
+		Plans:            plans,
 	}
 
 	// 6. Populate Current Plan (Only if a plan exists)
@@ -125,5 +136,5 @@ func (s *Handler) GetPlansHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	helpers.RespondWithJSON(w, 200, res)
-	helpers.LogInfo("GetPlansHandler", "plans sent")
+	return true
 }

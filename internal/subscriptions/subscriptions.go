@@ -74,6 +74,10 @@ func (h *Handler) Routes() chi.Router {
 	r.Post("/create", h.CreateHandler)
 	r.Post("/update", h.UpdateHandler)
 	r.Get("/{sub_id}/status", h.GetStatusHandler)
+	// r.Post("/{sub_id}/cancel", h.CancelSubscription)
+	r.Post("/offers/validate", h.ValidateOfferCode)
+	// r.Get("/invoices",h.GetAllInvoices)
+	// r.Get("/invoices/{invoice_id}",h.GetInvoice)
 	return r
 }
 

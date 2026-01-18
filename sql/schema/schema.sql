@@ -190,6 +190,7 @@ CREATE TABLE marketers (
   offer_code_life TEXT UNIQUE NOT NULL,
   razorpay_offer_id_life TEXT NOT NULL,
 
+    discount_percent INT NOT NULL DEFAULT 10,
   commission_percent INT NOT NULL CHECK (commission_percent BETWEEN 0 AND 40),
   commission_balance BIGINT NOT NULL DEFAULT 0, 
   total_commission BIGINT NOT NULL DEFAULT 0,
