@@ -9,6 +9,7 @@ import (
 )
 
 type configType struct {
+	MODE                 string
 	PORT                 string
 	DBURL                string
 	JWT_SECRET           string
@@ -47,10 +48,15 @@ var Plans = map[string]PlanStruct{
 }
 
 func LoadConfig() error {
+	mode := os.Getenv("MODE")
+	if mode == "" {
+		helpers.LogError("loadConfig", "MODE is not set in environment")
+		return fmt.Errorf("MODE is not set in environment")
+	}
 	port := os.Getenv("PORT")
 	if port == "" {
-		helpers.LogError("loadConfig", "port is not set in environment")
-		return fmt.Errorf("RAZORPAY_API_KEY is not set in environment")
+		helpers.LogError("loadConfig", "PORT is not set in environment")
+		return fmt.Errorf("PORT is not set in environment")
 	}
 
 	dburl := os.Getenv("DBURL")

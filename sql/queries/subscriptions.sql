@@ -231,3 +231,10 @@ WHERE id = $1;
 
 -- name: GetMarketerById :one
 SELECT * FROM marketers WHERE id = $1;
+
+-- while developing, subscription cleanup query
+-- name: DeleteSubscriptionInvoiceRows :exec
+DELETE FROM subscription_invoices WHERE business_id = $1;
+
+-- name: DeleteSubscriptionRows :exec
+DELETE FROM subscriptions WHERE business_id = $1;

@@ -79,6 +79,8 @@ func (h *Handler) Routes() chi.Router {
 	// future purpose
 	// r.Get("/invoices",h.GetAllInvoices)
 	// r.Get("/invoices/{invoice_id}",h.GetInvoice)
+	// while developing, to cleanup subscription
+	r.Post("/cleanup", h.cleanUpSubscription)
 	return r
 }
 
@@ -436,4 +438,49 @@ func (h *Handler) getCurrentPlan(w http.ResponseWriter, ctx context.Context, bus
 		return db.GetBusinessCurrentPlanRow{}, false
 	}
 	return curPlan, true
+}
+
+// cleanUpSubscription will not be exposed to frontend,
+// only to be used in dev
+func (h *Handler) cleanUpSubscription(w http.ResponseWriter, r *http.Request) {
+	if configs.Configs.MODE != "DEV" {
+		helpers.RespondWithError(w, http.StatusForbidden, "allowed only in dev mode")
+		helpers.LogError("cleanUpSubscription", "allowed only in dev mode")
+		return
+	}
+	businessId, ok := auth.ExtractUUID(w, r, "id")
+	if !ok {
+		return
+	}
+
+	// delete subscription invoices first
+	err := h.db.DeleteSubscriptionInvoiceRows(r.Context(), businessId)
+	if err != nil {
+		helpers.RespondWithError(w, 500, "error in DeleteSubscriptionInvoiceRows, err: "+err.Error())
+		helpers.LogError("cleanUpSubscription", "error in DeleteSubscriptionInvoiceRows, err: "+err.Error())
+		return
+	}
+	// delete subscription invoices first
+	err = h.db.DeleteSubscriptionRows(r.Context(), businessId)
+	if err != nil {
+		helpers.RespondWithError(w, 500, "error in DeleteSubscriptionRows, err: "+err.Error())
+		helpers.LogError("cleanUpSubscription", "error in DeleteSubscriptionRows, err: "+err.Error())
+		return
+	}
+
+	_, err = h.db.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
+		ID:                    businessId,
+		CurrentPlanID:         pgtype.Text{Valid: false},
+		SubscriptionsStatus:   db.SubscriptionsStatusInactive,
+		SubscriptionEndPeriod: pgtype.Timestamptz{Valid: false},
+		CurrentSubscriptionID: pgtype.UUID{Valid: false},
+		IsTrialUsed:           pgtype.Bool{Bool: false, Valid: true},
+		IsOfferUsed:           pgtype.Bool{Bool: false, Valid: true},
+	})
+	if err != nil {
+		helpers.RespondWithError(w, 500, "error in UpdateBusinessSubscription, err: "+err.Error())
+		helpers.LogError("cleanUpSubscription", "error in UpdateBusinessSubscription, err: "+err.Error())
+		return
+	}
+	helpers.RespondWithJSON(w, 201, "subscription cleanedup")
 }

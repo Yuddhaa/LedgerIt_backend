@@ -229,6 +229,25 @@ func (q *Queries) CreateSubscription(ctx context.Context, arg CreateSubscription
 	return i, err
 }
 
+const deleteSubscriptionInvoiceRows = `-- name: DeleteSubscriptionInvoiceRows :exec
+DELETE FROM subscription_invoices WHERE business_id = $1
+`
+
+// while developing, subscription cleanup query
+func (q *Queries) DeleteSubscriptionInvoiceRows(ctx context.Context, businessID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSubscriptionInvoiceRows, businessID)
+	return err
+}
+
+const deleteSubscriptionRows = `-- name: DeleteSubscriptionRows :exec
+DELETE FROM subscriptions WHERE business_id = $1
+`
+
+func (q *Queries) DeleteSubscriptionRows(ctx context.Context, businessID pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, deleteSubscriptionRows, businessID)
+	return err
+}
+
 const getBusinessCurrentPlan = `-- name: GetBusinessCurrentPlan :one
 SELECT 
     b.current_plan_id,
