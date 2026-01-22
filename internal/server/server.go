@@ -1,9 +1,12 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"LedgerIt/internal/admin"
 	"LedgerIt/internal/auth"
@@ -102,8 +105,43 @@ func (s *Server) setupRouter() {
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		helpers.LogInfo("setupRouter", "server is up and running", "route", "/")
-		w.Write([]byte("hello!! Server is up and running"))
+		// 1. Check Database Connection
+		// This sends a lightweight "Ping" packet to Postgres.
+		// It waits for a response or times out quickly.
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		err := s.pool.Ping(ctx) // Assuming 'h.pool' is your *pgxpool.Pool
+
+		status := "active"
+		dbStatus := "connected"
+		httpCode := http.StatusOK
+
+		if err != nil {
+			// If DB is down, we should technically return 500 so Render knows
+			// the app is "unhealthy" and shouldn't receive traffic.
+			status = "unhealthy"
+			dbStatus = "disconnected"
+			httpCode = http.StatusServiceUnavailable // 503
+
+			// Optional: Log the error so you know WHY it's failing
+			helpers.LogError("HealthCheck", "Database ping failed", "err", err.Error())
+		}
+
+		response := map[string]string{
+			"status":    status,
+			"database":  dbStatus,
+			"timestamp": time.Now().Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(httpCode)
+		json.NewEncoder(w).Encode(response)
+	})
+
+	r.Get("/cron,", func(w http.ResponseWriter, r *http.Request) {
+		helpers.LogInfo("setupRouter", "server is up and running", "route", "/cron")
+		w.Write([]byte("pong"))
 	})
 
 	r.Mount("/api/v1/auth/", authHandler.Routes())
@@ -139,6 +177,12 @@ func (s *Server) SlogLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get the RequestID from the context (set by middleware.RequestID)
 		reqID := middleware.GetReqID(r.Context())
+		path := r.URL.Path
+
+		if path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		helpers.LogInfo("SlogLoggerMiddleware", "incoming request",
 			"method", r.Method,
