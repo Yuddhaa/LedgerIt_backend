@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/configs"
@@ -73,29 +72,25 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	curBasePlan := strings.Split(curPlan.CurrentPlanID.String, "-")[1]
-	// check if the plans is a degrade
-	if configs.Plans[curBasePlan].Level > configs.Plans[body.BasePlan].Level {
+	addOnInt, err := strconv.Atoi(body.AddOn)
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusBadRequest, "Bad Request:bad add on")
+		helpers.LogInfo("UpdateHandler", "bad 'add_on' in body")
+		return
+	}
+	newPlanMembersCount := configs.Plans[body.BasePlan].UsersLimit + addOnInt
+	if int(curPlan.MembersCount) > newPlanMembersCount {
+		helpers.RespondWithError(w, http.StatusConflict, "Too many active members, can't update the plan")
+		helpers.LogError("UpdateHandler", "too many active members to degrade the plan", "newPlanMembersCount",
+			newPlanMembersCount, "curPlanMembersCount", curPlan.MembersCount)
+		return
+	}
 
-		addOnInt, err := strconv.Atoi(body.AddOn)
-		if err != nil {
-			helpers.RespondWithError(w, http.StatusBadRequest, "Bad Request:bad add on")
-			helpers.LogInfo("UpdateHandler", "bad 'add_on' in body")
-			return
-		}
-		newPlanMembersCount := configs.Plans[body.BasePlan].UsersLimit + addOnInt
-		if int(curPlan.MembersCount) > newPlanMembersCount {
-			helpers.RespondWithError(w, http.StatusConflict, "Too many active members, can't update the plan")
-			helpers.LogError("UpdateHandler", "too many active members to degrade the plan", "newPlanMembersCount",
-				newPlanMembersCount, "curPlanMembersCount", curPlan.MembersCount)
-			return
-		}
-
-		if body.BasePlan == "solo" {
-			// update db to solo plan
-			h.handleSoloPlan(w, r, body, userId, businessId, true, curPlan)
-			return
-		}
+	// from wholesale -> solo
+	if body.BasePlan == "solo" {
+		// update db to solo plan
+		h.handleSoloPlan(w, r, body, userId, businessId, true, curPlan)
+		return
 	}
 	// ****************************************************************************************************************
 	// if degrade is valid and newplan is not a solo plan,
@@ -114,7 +109,6 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 		"is_immediate":        body.IsImmediate,
 		"offer_code":          curPlan.OfferCode,
 	}
-	helpers.LogInfo("UpdateHandler", "offerCode", "offerCode", curPlan.OfferCode)
 	// ****************************************************************************************************************
 	// if plan is "owner" branch of to create order (instead of subscription)
 	// ****************************************************************************************************************

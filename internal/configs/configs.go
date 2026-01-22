@@ -41,11 +41,9 @@ type PlanStruct struct {
 
 // Plans gives details on each individual base plan
 var Plans = map[string]PlanStruct{
-	"solo":       {Level: 1, MonthlyBasePrice: 0, YearlyBasePrice: 0, UsersLimit: 1},
-	"retail":     {Level: 2, MonthlyBasePrice: 14900, YearlyBasePrice: 118800, UsersLimit: 3},
-	"wholesale":  {Level: 3, MonthlyBasePrice: 47900, YearlyBasePrice: 388800, UsersLimit: 8},
-	"enterprice": {Level: 4, MonthlyBasePrice: 97400, YearlyBasePrice: 838800, UsersLimit: 15},
-	"owner":      {Level: 5, MonthlyBasePrice: PERMANENT, YearlyBasePrice: PERMANENT, UsersLimit: 99999},
+	"solo":      {Level: 1, MonthlyBasePrice: 0, YearlyBasePrice: 0, UsersLimit: 1},
+	"wholesale": {Level: 2, MonthlyBasePrice: 14900, YearlyBasePrice: 118800, UsersLimit: 3},
+	"owner":     {Level: 3, MonthlyBasePrice: PERMANENT, YearlyBasePrice: PERMANENT, UsersLimit: 99999},
 }
 
 func LoadConfig() error {

@@ -32,7 +32,7 @@ type Handler struct {
 
 var (
 	PERIOD    = []string{"monthly", "yearly", "permanent"}
-	BASEPLANS = []string{"solo", "retail", "wholesale", "enterprice", "owner"}
+	BASEPLANS = []string{"solo", "wholesale", "owner"}
 )
 
 // reqType is used by /create and /update as a type for the r.Body
