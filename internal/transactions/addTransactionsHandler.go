@@ -77,8 +77,8 @@ func (h *Handler) AddTransactionsHandler(w http.ResponseWriter, r *http.Request)
 	}
 
 	// receipt number
-	if body.ReceiptNo == "" {
-		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: no receipt_no")
+	if body.Direction == db.TransactionDirectionIn && body.ReceiptNo == "" {
+		helpers.RespondWithError(w, http.StatusBadRequest, "bad request: no receipt_no for cash-in")
 		helpers.LogInfo("AddTransactionsHandler", "bad request: no receipt_no")
 		return
 	}
