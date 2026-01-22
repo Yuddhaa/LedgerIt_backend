@@ -139,7 +139,7 @@ func (s *Server) setupRouter() {
 		json.NewEncoder(w).Encode(response)
 	})
 
-	r.Get("/cron,", func(w http.ResponseWriter, r *http.Request) {
+	r.Get("/cron", func(w http.ResponseWriter, r *http.Request) {
 		helpers.LogInfo("setupRouter", "server is up and running", "route", "/cron")
 		w.Write([]byte("pong"))
 	})
