@@ -51,7 +51,6 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ---------------------------------------------------------------------------------------------------
 	// 1. GET: Find the token. This can happen *before* the transaction.
-	helpers.LogInfo("RefreshHandler", "before GetRefreshTokenByHash")
 	row, err := h.db.GetRefreshTokenByHash(r.Context(), hashedToken)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
@@ -67,7 +66,6 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	helpers.LogInfo("RefreshHandler", "after GetRefreshTokenByHash")
 
 	// ---------------------------------------------------------------------------------------------------
 	// 2. GENERATE: Create new tokens *before* starting the DB transaction.
@@ -100,7 +98,6 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	// ---------------------------------------------------------------------------------------------------
 	// 3. TRANSACTION: Begin atomic database operation
 
-	helpers.LogInfo("RefreshHandler", "before Begin tx")
 	tx, err := h.pool.Begin(r.Context())
 	if err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error starting transaction")
@@ -109,10 +106,8 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	// Defer a rollback. If Commit() is called, this does nothing.
 	defer tx.Rollback(r.Context())
-	helpers.LogInfo("RefreshHandler", "after Begin tx")
 
 	qtx := h.db.WithTx(tx)
-	helpers.LogInfo("RefreshHandler", "before InsertRefreshToken")
 	// 3a. INSERT the new token
 	if _, err := qtx.InsertRefreshToken(r.Context(), db.InsertRefreshTokenParams{
 		UserID:    row.UserID,
@@ -130,23 +125,18 @@ func (h *Handler) RefreshHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogError("RefreshHandler", "err in tx InsertRefreshToken", "error", err.Error())
 		return // Rollback is deferred
 	}
-	helpers.LogInfo("RefreshHandler", "after InsertRefreshToken")
-	helpers.LogInfo("RefreshHandler", "before DeleteRefreshTokenByHash")
 	// 3b. DELETE the old token
 	if err := qtx.DeleteRefreshTokenByHash(r.Context(), hashedToken); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error invalidating old token")
 		helpers.LogError("RefreshHandler", "err in tx DeleteRefreshTokenByHash", "error", err.Error())
 		return // Rollback is deferred
 	}
-	helpers.LogInfo("RefreshHandler", "after DeleteRefreshTokenByHash")
-	helpers.LogInfo("RefreshHandler", "before commit")
 	// 3c. COMMIT: If all went well, commit the transaction.
 	if err := tx.Commit(r.Context()); err != nil {
 		helpers.RespondWithError(w, http.StatusInternalServerError, "Error committing transaction")
 		helpers.LogError("RefreshHandler", "Failed to commit transaction", "error", err.Error())
 		return
 	}
-	helpers.LogInfo("RefreshHandler", "after commit")
 	// ---------------------------------------------------------------------------------------------------
 	// 4. RESPOND: All database work is done. Send the new tokens to the client.
 	res := resType{

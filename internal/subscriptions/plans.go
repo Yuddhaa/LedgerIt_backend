@@ -7,6 +7,7 @@ import (
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/configs"
+	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
 	"github.com/jackc/pgx/v5"
@@ -46,6 +47,7 @@ func (h Handler) getPlans(w http.ResponseWriter, r *http.Request, monthlyAddon, 
 		CurrentPlan      *currentPlanDetails           `json:"current_plan"` // Pointer allows null
 		IsFreeAvailable  bool                          `json:"is_free_available"`
 		IsTrialAvailable bool                          `json:"is_trial_available"`
+		IsOfferAvailable bool                          `json:"is_offer_available"`
 		MonthlyAddon     int                           `json:"monthly_addon"`
 		YearlyAddon      int                           `json:"yearly_addon"`
 		Plans            map[string]configs.PlanStruct `json:"base_plans"`
@@ -91,6 +93,7 @@ func (h Handler) getPlans(w http.ResponseWriter, r *http.Request, monthlyAddon, 
 		Plans:            plans,
 	}
 
+	var isOfferAvailable bool
 	// 6. Populate Current Plan (Only if a plan exists)
 	if dbPlan.CurrentPlanID.Valid {
 		// A. Parse Plan ID (e.g., "monthly-retail-5" -> base="retail", addon=5)
@@ -130,10 +133,30 @@ func (h Handler) getPlans(w http.ResponseWriter, r *http.Request, monthlyAddon, 
 			SubscriptionID:         subIDStr,
 			RazorpaySubscriptionID: rzpSubIDStr,
 		}
+
+		if !dbPlan.IsOfferUsed {
+			switch dbPlan.SubscriptionsStatus {
+			// A. In a Trial or Trial Expired (Past Due) -> Hasn't paid yet -> Eligible
+			case db.SubscriptionsStatusTrialing, db.SubscriptionsStatusPastDue:
+				isOfferAvailable = true
+
+			// B. Active -> Only eligible if it is the Free (Solo) plan
+			case db.SubscriptionsStatusActive:
+				if dbPlan.CurrentPlanID.String == configs.FREE_PLAN_ID {
+					isOfferAvailable = true
+				}
+
+			// C. Inactive/Canceled -> Eligible (assuming IsOfferUsed caught the paid-then-canceled users)
+			case db.SubscriptionsStatusInactive:
+				isOfferAvailable = true
+			}
+		}
 	} else {
 		// No plan assigned
 		res.CurrentPlan = nil
+		isOfferAvailable = true
 	}
+	res.IsOfferAvailable = isOfferAvailable
 
 	helpers.RespondWithJSON(w, 200, res)
 	return true
