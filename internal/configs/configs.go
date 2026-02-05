@@ -16,6 +16,7 @@ type configType struct {
 	GOOGLE_WEB_CLIENT_ID string
 	GOOGLE_ANDROID_ID    string
 	GOOGLE_IOS_ID        string
+	FIREBASE_CLIENT_ID   string
 	RAZORPAY_API_KEY     string
 	RAZORPAY_API_SECRET  string
 }
@@ -95,6 +96,12 @@ func LoadConfig() error {
 		return fmt.Errorf("GOOGLE_IOS_ID is not set")
 	}
 
+	firebaseClientId := os.Getenv("FIREBASE_CLIENT_ID")
+	if googleIOSId == "" {
+		helpers.LogError("auth.NewHandler", "FIREBASE_CLIENT_ID is not set in environment")
+		return fmt.Errorf("FIREBASE_CLIENT_ID is not set")
+	}
+
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if jwtSecret == "" {
 		helpers.LogError("auth.NewHandler", "JWT_SECRET is not set in environment")
@@ -109,6 +116,7 @@ func LoadConfig() error {
 		GOOGLE_WEB_CLIENT_ID: googleClientID,
 		GOOGLE_ANDROID_ID:    googleAndroidId,
 		GOOGLE_IOS_ID:        googleIOSId,
+		FIREBASE_CLIENT_ID:   firebaseClientId,
 		JWT_SECRET:           jwtSecret,
 	}
 	return nil
