@@ -53,6 +53,7 @@ func (h *Handler) GoogleAuthHandler(w http.ResponseWriter, r *http.Request) {
 		configs.Configs.GOOGLE_ANDROID_ID,    // Add your Android Client ID here
 		configs.Configs.GOOGLE_IOS_ID,        // Add your iOS Client ID here
 		configs.Configs.FIREBASE_CLIENT_ID,
+		"379597019284-3o6bc2tabtp9253a86736drvu0mld9a1.apps.googleusercontent.com", // Remove this
 		// If you are using Expo Go, it might have a specific ID too
 	}
 
