@@ -1,24 +1,31 @@
 package server
 
 import (
+	"context"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"os"
+	"time"
 
 	"LedgerIt/internal/admin"
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/business"
 	"LedgerIt/internal/categories"
+	"LedgerIt/internal/configs"
 	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 	"LedgerIt/internal/parties"
+	"LedgerIt/internal/subscriptions"
 	"LedgerIt/internal/transactions"
 	"LedgerIt/internal/users"
+	"LedgerIt/internal/webhooks"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/razorpay/razorpay-go"
 )
 
 // Server holds all dependencies for the HTTP server.
@@ -59,8 +66,10 @@ func (s *Server) setupRouter() {
 		AllowedOrigins: []string{
 			"http://localhost:3000",  // optional (web dev)
 			"http://localhost:8000",  // optional (web dev)
+			"http://localhost:5173",  // optional (web dev)
 			"http://localhost:19006", // Expo dev
 			"https://ledgerit-backend.onrender.com",
+			"https://churchly-phebe-inconstantly.ngrok-free.dev",
 		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
@@ -83,17 +92,62 @@ func (s *Server) setupRouter() {
 	partiesHandler := parties.NewHandler(s.db, s.pool)
 	categoriesHandler := categories.NewHandler(s.db, s.pool)
 
+	rp_client := razorpay.NewClient(configs.Configs.RAZORPAY_API_KEY, configs.Configs.RAZORPAY_API_SECRET)
+
+	subscriptionsHandler := subscriptions.NewHandler(s.db, s.pool, rp_client)
+	webhooksHandler, err := webhooks.NewHandler(s.db, s.pool, rp_client)
+	if err != nil {
+		helpers.LogError("setupRouter", "error in intialising webhooksHandler", "err", err.Error())
+		os.Exit(1)
+	}
+
 	// for transactionshandler
 	dbStore := db.NewDBStore(s.pool)
 	transactionsHandler := transactions.NewHandler(dbStore)
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		helpers.LogInfo("setupRouter", "server is up and running", "route", "/")
-		w.Write([]byte("hello!! Server is up and running"))
+		// 1. Check Database Connection
+		// This sends a lightweight "Ping" packet to Postgres.
+		// It waits for a response or times out quickly.
+		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
+		defer cancel()
+
+		err := s.pool.Ping(ctx) // Assuming 'h.pool' is your *pgxpool.Pool
+
+		status := "active"
+		dbStatus := "connected"
+		httpCode := http.StatusOK
+
+		if err != nil {
+			// If DB is down, we should technically return 500 so Render knows
+			// the app is "unhealthy" and shouldn't receive traffic.
+			status = "unhealthy"
+			dbStatus = "disconnected"
+			httpCode = http.StatusServiceUnavailable // 503
+
+			// Optional: Log the error so you know WHY it's failing
+			helpers.LogError("HealthCheck", "Database ping failed", "err", err.Error())
+		}
+
+		response := map[string]string{
+			"status":    status,
+			"database":  dbStatus,
+			"timestamp": time.Now().Format(time.RFC3339),
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(httpCode)
+		json.NewEncoder(w).Encode(response)
+	})
+
+	r.Get("/cron", func(w http.ResponseWriter, r *http.Request) {
+		helpers.LogInfo("setupRouter", "server is up and running", "route", "/cron")
+		w.Write([]byte("pong"))
 	})
 
 	r.Mount("/api/v1/auth/", authHandler.Routes())
+	r.Mount("/api/v1/webhooks", webhooksHandler.Routes())
 
 	// --- Protected Routes (under JWT Auth) ---
 	r.Group(func(r chi.Router) {
@@ -113,6 +167,7 @@ func (s *Server) setupRouter() {
 		r.Mount("/api/v1/business/{id}/transactions", transactionsHandler.Routes())
 		r.Mount("/api/v1/business/{id}/parties", partiesHandler.Routes())
 		r.Mount("/api/v1/business/{id}/categories", categoriesHandler.Routes())
+		r.Mount("/api/v1/business/{id}/subscriptions", subscriptionsHandler.Routes())
 	})
 
 	s.Router = r
@@ -124,6 +179,12 @@ func (s *Server) SlogLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Get the RequestID from the context (set by middleware.RequestID)
 		reqID := middleware.GetReqID(r.Context())
+		path := r.URL.Path
+
+		if path == "/health" {
+			next.ServeHTTP(w, r)
+			return
+		}
 
 		helpers.LogInfo("SlogLoggerMiddleware", "incoming request",
 			"method", r.Method,

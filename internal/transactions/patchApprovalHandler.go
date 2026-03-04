@@ -16,9 +16,6 @@ import (
 
 func (h *Handler) PatchApprovalHandler(w http.ResponseWriter, r *http.Request) {
 	// 1. Parse Request
-	// type resType struct {
-	// 	Request db.PatchEditRequestRow `json:"request"`
-	// }
 	type transaction struct {
 		tranReqType
 		CategoryName *string `json:"category_name"`

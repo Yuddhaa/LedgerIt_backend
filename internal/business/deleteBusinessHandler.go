@@ -5,6 +5,8 @@ import (
 	"net/http"
 
 	"LedgerIt/internal/auth"
+	"LedgerIt/internal/configs"
+	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 
 	"github.com/jackc/pgx/v5"
@@ -17,12 +19,33 @@ func (h *Handler) DeleteBusinessHandler(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	if role == 2 {
+	if role != 1 {
 		helpers.RespondWithError(w, http.StatusUnauthorized, "Not enough credentials")
-		helpers.LogInfo("AddMemberHandler", "not an admin|creator")
+		helpers.LogInfo("AddMemberHandler", "not a creator")
 		return
 	}
 	businessId, ok := auth.ExtractUUID(w, r, "id")
+	if !ok {
+		return
+	}
+	curPlan, err := h.db.GetBusinessCurrentPlan(r.Context(), businessId)
+	if err != nil {
+		// err no rows is not required since in getrole its already established that the Business exists
+		helpers.RespondWithError(w, http.StatusInternalServerError, "Internal server error")
+		helpers.LogError("getrole", "db error in GetBusinessCurrentPlan", "error", err.Error(),
+			"businessId", businessId)
+		return
+	}
+
+	isActive := curPlan.SubscriptionsStatus == db.SubscriptionsStatusActive ||
+		curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialing ||
+		curPlan.SubscriptionsStatus == db.SubscriptionsStatusPastDue // may be charge wasn't confirmed yet
+
+	if isActive && curPlan.CurrentPlanID.String != configs.FREE_PLAN_ID {
+		helpers.RespondWithError(w, http.StatusForbidden, "can't delete active subscribed business")
+		helpers.LogInfo("DeleteBusinessHandler", "can't delete active subscribed business")
+		return
+	}
 	if err := h.db.DeleteBusiness(r.Context(), businessId); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			helpers.RespondWithError(w, http.StatusNotFound, "business not found")

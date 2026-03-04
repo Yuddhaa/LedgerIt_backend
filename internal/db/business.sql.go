@@ -63,7 +63,7 @@ func (q *Queries) CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, 
 }
 
 const createBusinessAndAddOwner = `-- name: CreateBusinessAndAddOwner :one
-SELECT id, name, owner_id, created_at, updated_at FROM create_business_and_add_owner(
+SELECT id, name, owner_id, created_at, updated_at, current_plan_id, subscriptions_status, subscription_end_period, is_trial_used, current_subscription_id, is_offer_used, offer_code FROM create_business_and_add_owner(
     p_owner_id := $1,
     p_name := $2
 )
@@ -83,6 +83,13 @@ func (q *Queries) CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusin
 		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CurrentPlanID,
+		&i.SubscriptionsStatus,
+		&i.SubscriptionEndPeriod,
+		&i.IsTrialUsed,
+		&i.CurrentSubscriptionID,
+		&i.IsOfferUsed,
+		&i.OfferCode,
 	)
 	return i, err
 }
@@ -112,8 +119,31 @@ func (q *Queries) DeleteBusinessMember(ctx context.Context, arg DeleteBusinessMe
 	return err
 }
 
+const deleteTransaction = `-- name: DeleteTransaction :one
+DELETE FROM transactions WHERE id=$1 AND business_id = $2 RETURNING user_id, amount, direction
+`
+
+type DeleteTransactionParams struct {
+	ID         pgtype.UUID `json:"id"`
+	BusinessID pgtype.UUID `json:"business_id"`
+}
+
+type DeleteTransactionRow struct {
+	UserID    pgtype.UUID          `json:"user_id"`
+	Amount    pgtype.Numeric       `json:"amount"`
+	Direction TransactionDirection `json:"direction"`
+}
+
+// used to delete a transactions
+func (q *Queries) DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) (DeleteTransactionRow, error) {
+	row := q.db.QueryRow(ctx, deleteTransaction, arg.ID, arg.BusinessID)
+	var i DeleteTransactionRow
+	err := row.Scan(&i.UserID, &i.Amount, &i.Direction)
+	return i, err
+}
+
 const getBusinessByID = `-- name: GetBusinessByID :one
-SELECT b.id, b.name, b.owner_id, b.created_at, b.updated_at,bm.user_id,bm.role,bm.current_balance 
+SELECT b.id, b.name, b.owner_id, b.created_at, b.updated_at, b.current_plan_id, b.subscriptions_status, b.subscription_end_period, b.is_trial_used, b.current_subscription_id, b.is_offer_used, b.offer_code,bm.user_id,bm.role,bm.current_balance 
 FROM businesses b
 JOIN
     business_members bm ON b.id = bm.business_id
@@ -126,14 +156,21 @@ type GetBusinessByIDParams struct {
 }
 
 type GetBusinessByIDRow struct {
-	ID             pgtype.UUID        `json:"id"`
-	Name           string             `json:"name"`
-	OwnerID        pgtype.UUID        `json:"owner_id"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	UserID         pgtype.UUID        `json:"user_id"`
-	Role           BusinessRole       `json:"role"`
-	CurrentBalance pgtype.Numeric     `json:"current_balance"`
+	ID                    pgtype.UUID         `json:"id"`
+	Name                  string              `json:"name"`
+	OwnerID               pgtype.UUID         `json:"owner_id"`
+	CreatedAt             pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz  `json:"updated_at"`
+	CurrentPlanID         pgtype.Text         `json:"current_plan_id"`
+	SubscriptionsStatus   SubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndPeriod pgtype.Timestamptz  `json:"subscription_end_period"`
+	IsTrialUsed           bool                `json:"is_trial_used"`
+	CurrentSubscriptionID pgtype.UUID         `json:"current_subscription_id"`
+	IsOfferUsed           bool                `json:"is_offer_used"`
+	OfferCode             pgtype.Text         `json:"offer_code"`
+	UserID                pgtype.UUID         `json:"user_id"`
+	Role                  BusinessRole        `json:"role"`
+	CurrentBalance        pgtype.Numeric      `json:"current_balance"`
 }
 
 // Retrieves a single business record by its unique ID.
@@ -146,6 +183,13 @@ func (q *Queries) GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams
 		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CurrentPlanID,
+		&i.SubscriptionsStatus,
+		&i.SubscriptionEndPeriod,
+		&i.IsTrialUsed,
+		&i.CurrentSubscriptionID,
+		&i.IsOfferUsed,
+		&i.OfferCode,
 		&i.UserID,
 		&i.Role,
 		&i.CurrentBalance,
@@ -199,7 +243,7 @@ func (q *Queries) GetBusinessMembers(ctx context.Context, businessID pgtype.UUID
 }
 
 const getBusinessesByOwnerID = `-- name: GetBusinessesByOwnerID :many
-SELECT id, name, owner_id, created_at, updated_at FROM businesses
+SELECT id, name, owner_id, created_at, updated_at, current_plan_id, subscriptions_status, subscription_end_period, is_trial_used, current_subscription_id, is_offer_used, offer_code FROM businesses
 WHERE owner_id = $1
 `
 
@@ -219,6 +263,13 @@ func (q *Queries) GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUI
 			&i.OwnerID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CurrentPlanID,
+			&i.SubscriptionsStatus,
+			&i.SubscriptionEndPeriod,
+			&i.IsTrialUsed,
+			&i.CurrentSubscriptionID,
+			&i.IsOfferUsed,
+			&i.OfferCode,
 		); err != nil {
 			return nil, err
 		}
@@ -232,7 +283,7 @@ func (q *Queries) GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUI
 
 const getBusinessesByUserID = `-- name: GetBusinessesByUserID :many
 SELECT 
-    b.id, b.name, b.owner_id, b.created_at, b.updated_at
+    b.id, b.name, b.owner_id, b.created_at, b.updated_at, b.current_plan_id, b.subscriptions_status, b.subscription_end_period, b.is_trial_used, b.current_subscription_id, b.is_offer_used, b.offer_code
     -- bm.role, 
     -- bm.current_balance
 FROM 
@@ -259,6 +310,13 @@ func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID)
 			&i.OwnerID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.CurrentPlanID,
+			&i.SubscriptionsStatus,
+			&i.SubscriptionEndPeriod,
+			&i.IsTrialUsed,
+			&i.CurrentSubscriptionID,
+			&i.IsOfferUsed,
+			&i.OfferCode,
 		); err != nil {
 			return nil, err
 		}
@@ -353,7 +411,7 @@ SET
   updated_at = NOW()
 WHERE
   id = $1
-RETURNING id, name, owner_id, created_at, updated_at
+RETURNING id, name, owner_id, created_at, updated_at, current_plan_id, subscriptions_status, subscription_end_period, is_trial_used, current_subscription_id, is_offer_used, offer_code
 `
 
 type UpdateBusinessParams struct {
@@ -370,6 +428,13 @@ func (q *Queries) UpdateBusiness(ctx context.Context, arg UpdateBusinessParams) 
 		&i.OwnerID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.CurrentPlanID,
+		&i.SubscriptionsStatus,
+		&i.SubscriptionEndPeriod,
+		&i.IsTrialUsed,
+		&i.CurrentSubscriptionID,
+		&i.IsOfferUsed,
+		&i.OfferCode,
 	)
 	return i, err
 }

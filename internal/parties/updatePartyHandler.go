@@ -15,6 +15,15 @@ import (
 )
 
 func (h *Handler) UpdatePartyHandler(w http.ResponseWriter, r *http.Request) {
+	role, ok := auth.GetUserRoleFromContext(w, r)
+	if !ok {
+		return
+	}
+	if role == 2 {
+		helpers.LogError("UpdatePartyHandler", "Not an admin or creator to update parties")
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Not an admin or creator")
+		return
+	}
 	type reqType struct {
 		Name        string `json:"name"`
 		Place       string `json:"place"`

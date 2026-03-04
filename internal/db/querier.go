@@ -13,16 +13,27 @@ import (
 type Querier interface {
 	// Adds a user to a business with a specific role, returning the new membership record.
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
+	AddMarketerCommission(ctx context.Context, arg AddMarketerCommissionParams) error
+	CancelSubscription(ctx context.Context, razorpaySubscriptionID string) error
 	// returns 1 if a user is admin or creator of a given business_id
 	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
 	// returns 1 if a user is a member of a given business_id
 	CheckMember(ctx context.Context, arg CheckMemberParams) (int32, error)
+	// CheckUserPlanEligibility checks if the user has free businesses
+	// or trial period available
+	CheckUserPlanEligibility(ctx context.Context, ownerID pgtype.UUID) (CheckUserPlanEligibilityRow, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	// add a new category
 	CreateCategory(ctx context.Context, arg CreateCategoryParams) (TransactionCategory, error)
 	CreateEditRequest(ctx context.Context, arg CreateEditRequestParams) (TransactionEditRequest, error)
+	// Create the missing Invoice Query (we need this for the charged event)
+	CreateInvoice(ctx context.Context, arg CreateInvoiceParams) (pgtype.UUID, error)
 	// add a party
 	CreateParty(ctx context.Context, arg CreatePartyParams) (Party, error)
+	// CreatePlan adds a new plan to plans table
+	CreatePlan(ctx context.Context, arg CreatePlanParams) (Plan, error)
+	// CreateSubscription creates new row in subscriptions table
+	CreateSubscription(ctx context.Context, arg CreateSubscriptionParams) (Subscription, error)
 	CreateTransactionWithValidation(ctx context.Context, arg CreateTransactionWithValidationParams) (Transaction, error)
 	// used to delete a business
 	DeleteBusiness(ctx context.Context, id pgtype.UUID) error
@@ -38,8 +49,15 @@ type Querier interface {
 	// DeleteRefreshTokensByUserID deletes all refresh tokens for a specific user.
 	// This is used for the "log out from all devices" feature.
 	DeleteRefreshTokensByUserID(ctx context.Context, userID pgtype.UUID) error
+	// while developing, subscription cleanup query
+	DeleteSubscriptionInvoiceRows(ctx context.Context, businessID pgtype.UUID) error
+	DeleteSubscriptionRows(ctx context.Context, businessID pgtype.UUID) error
+	// used to delete a transactions
+	DeleteTransaction(ctx context.Context, arg DeleteTransactionParams) (DeleteTransactionRow, error)
 	// Retrieves a single business record by its unique ID.
 	GetBusinessByID(ctx context.Context, arg GetBusinessByIDParams) (GetBusinessByIDRow, error)
+	// GetBusinessCurrentPlan gets the details on the current plan
+	GetBusinessCurrentPlan(ctx context.Context, id pgtype.UUID) (GetBusinessCurrentPlanRow, error)
 	// GetBusinessMembers returns all the particular business members
 	GetBusinessMembers(ctx context.Context, businessID pgtype.UUID) ([]GetBusinessMembersRow, error)
 	// Retrieves all businesses owned by a specific user ID.
@@ -48,15 +66,25 @@ type Querier interface {
 	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
 	// get a particular category
 	GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error)
+	GetMarketerById(ctx context.Context, id pgtype.UUID) (Marketer, error)
 	// Based on userid and businessid it will return role
 	GetMemberRole(ctx context.Context, arg GetMemberRoleParams) (BusinessRole, error)
 	// used to get a member details
 	GetMemberRoleBalance(ctx context.Context, arg GetMemberRoleBalanceParams) (GetMemberRoleBalanceRow, error)
+	// ********************************************************************************************************************
+	// offers related
+	// ********************************************************************************************************************
+	GetOfferDetailsByCode(ctx context.Context, code string) (GetOfferDetailsByCodeRow, error)
 	// get a particular party
 	GetParty(ctx context.Context, arg GetPartyParams) (Party, error)
+	// GetPlan query gets plan based on the planId
+	GetPlan(ctx context.Context, id string) (Plan, error)
 	// GetRefreshTokenByHash finds a valid (non-expired) refresh token by its hash.
 	// This is used during the /auth/refresh flow.
 	GetRefreshTokenByHash(ctx context.Context, tokenHash string) (GetRefreshTokenByHashRow, error)
+	// Query to find subscription by Razorpay ID (Critical for Webhooks)
+	GetSubscriptionByRazorpayID(ctx context.Context, razorpaySubscriptionID string) (Subscription, error)
+	GetSubscriptionStatus(ctx context.Context, arg GetSubscriptionStatusParams) (SubscriptionsStatus, error)
 	// 1. Joins for REQUESTED changes (from JSON)
 	// 2. NEW: Joins for ORIGINAL transaction (from Columns)
 	GetTransactionApprovals(ctx context.Context, arg GetTransactionApprovalsParams) ([]GetTransactionApprovalsRow, error)
@@ -91,10 +119,16 @@ type Querier interface {
 	UpdateBusinessMember(ctx context.Context, arg UpdateBusinessMemberParams) (BusinessMember, error)
 	// used to update balance in transactions
 	UpdateBusinessMemberBalance(ctx context.Context, arg UpdateBusinessMemberBalanceParams) error
+	// UpdateBusinessSubscription updates subscriptions related columns
+	UpdateBusinessSubscription(ctx context.Context, arg UpdateBusinessSubscriptionParams) (Business, error)
 	// update a particular category
 	UpdateCategory(ctx context.Context, arg UpdateCategoryParams) (TransactionCategory, error)
 	// update a particular party
 	UpdateParty(ctx context.Context, arg UpdatePartyParams) (Party, error)
+	UpdateStatusIfPending(ctx context.Context, arg UpdateStatusIfPendingParams) error
+	UpdateSubscriptionAndBusiness(ctx context.Context, arg UpdateSubscriptionAndBusinessParams) error
+	// Used for simple state changes like Paused, Resumed, Pending, Halted
+	UpdateSubscriptionStatusRaw(ctx context.Context, arg UpdateSubscriptionStatusRawParams) error
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)

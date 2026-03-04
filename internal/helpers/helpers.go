@@ -5,7 +5,9 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 func RespondWithJSON(w http.ResponseWriter, code int, payload any) error {
@@ -40,4 +42,18 @@ func IsUniqueViolation(err error) bool {
 		return pgErr.Code == "23505"
 	}
 	return false
+}
+
+// StringToUUID converts given string to pgtype.UUID
+func StringToUUID(w http.ResponseWriter, r *http.Request, variable, uuidStr string) (pgtype.UUID, bool) {
+	uuidBytes, err := uuid.Parse(uuidStr)
+	if err != nil {
+		RespondWithError(w, http.StatusBadRequest, "Bad Request: "+variable)
+		LogError("StringToUUID", "error in converting "+variable+" to uuid", "error", err.Error(), "string", uuidStr)
+		return pgtype.UUID{}, false
+	}
+	return pgtype.UUID{
+		Bytes: uuidBytes,
+		Valid: uuidBytes != uuid.Nil,
+	}, true
 }

@@ -12,6 +12,15 @@ import (
 )
 
 func (h *Handler) DeletePartyHandler(w http.ResponseWriter, r *http.Request) {
+	role, ok := auth.GetUserRoleFromContext(w, r)
+	if !ok {
+		return
+	}
+	if role == 2 {
+		helpers.LogError("DeletePartyHandler", "Not an admin or creator to delete parties")
+		helpers.RespondWithError(w, http.StatusUnauthorized, "Not an admin or creator")
+		return
+	}
 	businessId, ok := auth.ExtractUUID(w, r, "id")
 	if !ok {
 		return
