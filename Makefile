@@ -31,6 +31,13 @@ build:
 	@mkdir -p bin
 	@go build -o ./bin/server ./cmd/main/main.go
 
+# Build the Go binary locally for linux
+build-linux:
+	@echo "Building go binary for linux..."
+	@mkdir -p bin
+	@GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags="-s -w" -o ./bin/server_linux ./cmd/main/main.go
+	@echo "Build complete go binary for linux"
+
 run: build
 	./bin/server
 
@@ -67,4 +74,5 @@ help:
 	@echo "  make down         - Stop and remove Docker containers"
 	@echo "  make logs         - Tail the logs from the 'api' container"
 	@echo "  make build        - Build the Go binary locally"
+	@echo "  make build-linux  - Build the Go binary locally for linux"
 	@echo "  make install-air  - Install the 'air' tool"

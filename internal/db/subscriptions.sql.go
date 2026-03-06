@@ -55,6 +55,21 @@ func (q *Queries) CancelSubscription(ctx context.Context, razorpaySubscriptionID
 	return err
 }
 
+const cancelTrial = `-- name: CancelTrial :exec
+UPDATE businesses
+SET 
+    subscriptions_status = 'canceled', -- Or 'trial_ended' if you prefer that distinction
+    subscription_end_period = now(),   -- Cut off access immediately
+    updated_at = now()
+WHERE id = $1 
+  AND (subscriptions_status = 'trialing' OR subscriptions_status = 'trial_ended')
+`
+
+func (q *Queries) CancelTrial(ctx context.Context, id pgtype.UUID) error {
+	_, err := q.db.Exec(ctx, cancelTrial, id)
+	return err
+}
+
 const checkUserPlanEligibility = `-- name: CheckUserPlanEligibility :one
 SELECT 
     -- Logic: If count of 'free' plans is 0, then Free IS available.

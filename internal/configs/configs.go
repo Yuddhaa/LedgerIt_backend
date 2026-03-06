@@ -3,13 +3,14 @@ package configs
 import (
 	"fmt"
 	"os"
+	"slices"
 	"time"
 
 	"LedgerIt/internal/helpers"
 )
 
 type configType struct {
-	MODE                 string
+	MODE                 string // DEV | PROD
 	PORT                 string
 	DBURL                string
 	JWT_SECRET           string
@@ -28,7 +29,7 @@ const (
 	YEARLY_ADDON  = 70800
 	PERMANENT     = 1499900
 	TRIAL_DAYS    = time.Duration(90 * 24 * time.Hour)
-	// TRIAL_DAYS   = time.Duration(time.Minute * 10)
+	// TRIAL_DAYS        = time.Duration(time.Minute)
 	FREE_PLAN_ID      = "permanent-solo-0"
 	PERMANENT_PLAN_ID = "permanent-owner-99999"
 )
@@ -50,8 +51,8 @@ var Plans = map[string]PlanStruct{
 
 func LoadConfig() error {
 	mode := os.Getenv("MODE")
-	if mode == "" {
-		helpers.LogError("loadConfig", "MODE is not set in environment")
+	if mode == "" || !slices.Contains([]string{"DEV", "PROD"}, mode) {
+		helpers.LogError("loadConfig", "MODE is not set properly in environment, mode:"+mode)
 		return fmt.Errorf("MODE is not set in environment")
 	}
 	port := os.Getenv("PORT")
@@ -110,6 +111,7 @@ func LoadConfig() error {
 
 	Configs = configType{
 		PORT:                 port,
+		MODE:                 mode,
 		DBURL:                dburl,
 		RAZORPAY_API_KEY:     razorpayKey,
 		RAZORPAY_API_SECRET:  razorpaySecret,

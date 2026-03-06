@@ -7,6 +7,7 @@ import (
 
 	"LedgerIt/internal/auth"
 	"LedgerIt/internal/configs"
+	"LedgerIt/internal/db"
 	"LedgerIt/internal/helpers"
 )
 
@@ -69,6 +70,20 @@ func (h *Handler) UpdateHandler(w http.ResponseWriter, r *http.Request) {
 	if curPlan.CurrentPlanID.String == configs.PERMANENT_PLAN_ID {
 		helpers.RespondWithError(w, http.StatusForbidden, "cannot update as current plan is 'owner'")
 		helpers.LogInfo("UpdateHandler", "cannot update as curplan is owner")
+		return
+	}
+
+	// ****************************************************************************************************************
+	// Ensure the subscription is actually "Alive" and capable of being updated
+	// ****************************************************************************************************************
+	status := curPlan.SubscriptionsStatus
+	isAlive := status == db.SubscriptionsStatusActive ||
+		status == db.SubscriptionsStatusPastDue ||
+		status == db.SubscriptionsStatusPaused
+
+	if !isAlive {
+		helpers.RespondWithError(w, http.StatusConflict, "Cannot update this subscription because it is not active. Please use /create to start a new plan.")
+		helpers.LogError("UpdateHandler", "Attempted to update a dead/trial subscription", "businessId", businessId, "status", status)
 		return
 	}
 

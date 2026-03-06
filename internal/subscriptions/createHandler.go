@@ -65,9 +65,12 @@ func (h *Handler) CreateHandler(w http.ResponseWriter, r *http.Request) {
 	if curPlan.SubscriptionID.Valid {
 		status := curPlan.SubscriptionsStatus
 
-		// Logic: We want to BLOCK if the status is "Alive".
-		// "Alive" means it is NOT canceled AND it is NOT past_due.
-		isAlive := status != db.SubscriptionsStatusCanceled && status != db.SubscriptionsStatusPastDue
+		// Logic: We want to BLOCK /create if the subscription is "Alive".
+		// An "Alive" subscription is one that Razorpay is currently managing,
+		// even if the payment is temporarily failing or paused.
+		isAlive := status == db.SubscriptionsStatusActive ||
+			status == db.SubscriptionsStatusPastDue ||
+			status == db.SubscriptionsStatusPaused
 
 		// If it IS alive, we throw the error.
 		if isAlive {

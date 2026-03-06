@@ -37,11 +37,10 @@ func (h *Handler) DeleteBusinessHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	isActive := curPlan.SubscriptionsStatus == db.SubscriptionsStatusActive ||
-		curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialing ||
-		curPlan.SubscriptionsStatus == db.SubscriptionsStatusPastDue // may be charge wasn't confirmed yet
+	isCancelled := curPlan.SubscriptionsStatus == db.SubscriptionsStatusCanceled ||
+		curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialEnded
 
-	if isActive && curPlan.CurrentPlanID.String != configs.FREE_PLAN_ID {
+	if !isCancelled && curPlan.CurrentPlanID.String != configs.FREE_PLAN_ID {
 		helpers.RespondWithError(w, http.StatusForbidden, "can't delete active subscribed business")
 		helpers.LogInfo("DeleteBusinessHandler", "can't delete active subscribed business")
 		return

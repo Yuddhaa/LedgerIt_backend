@@ -198,6 +198,15 @@ WHERE businesses.id = updated_sub.business_id
   -- SAFETY: Only cancel business status if this was the CURRENT active subscription
   AND businesses.current_subscription_id = updated_sub.id;
 
+-- name: CancelTrial :exec
+UPDATE businesses
+SET 
+    subscriptions_status = 'canceled', -- Or 'trial_ended' if you prefer that distinction
+    subscription_end_period = now(),   -- Cut off access immediately
+    updated_at = now()
+WHERE id = $1 
+  AND (subscriptions_status = 'trialing' OR subscriptions_status = 'trial_ended');
+
 -- name: GetSubscriptionStatus :one
 SELECT status FROM subscriptions WHERE business_id = $1 AND id = $2;
 

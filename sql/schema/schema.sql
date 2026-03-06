@@ -204,12 +204,14 @@ CREATE TABLE marketers (
 -- inactive -- in business table as a default
 -- pending -- in the subscripitons table as a default, also 'pending' is set when 'subscription.pending' webhook is arrived.
 -- trialing -- to show the business is in trial phase
+-- trial_ended -- to show the business trial has ended
 -- active -- business has active subscription
--- past_due -- subscription is past_due for payment. This will be set after trial expires, or when 'subscription.halted' webhook arrives.
+-- past_due -- subscription is past_due for payment. 
+        -- This will be set after the subscription_end_period+1 hour exceeds or  when 'subscription.halted' webhook arrives.
 -- paused -- when 'subscription.paused' webhook arrives.
 -- canceled -- when 'subscription.cancelled' webhook arrives(either user manually cancels through in-app, or while upgrading the plan or user cancles through UPI/card)
 CREATE TYPE subscriptions_status AS ENUM ( 'inactive', 'pending', 'trialing','trialing_pending', 'active', 
-    'past_due', 'paused', 'canceled', 'expired', 'authenticated'
+    'past_due', 'paused', 'canceled', 'expired', 'authenticated', 'trial_ended'
 );
 
 CREATE TABLE subscriptions (

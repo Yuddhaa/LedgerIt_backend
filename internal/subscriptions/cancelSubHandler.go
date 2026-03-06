@@ -48,6 +48,27 @@ func (h *Handler) CancelSubHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogError("CancelSubHandler", "cannot cancel lifetime plan, already paid", "businessId", businessId)
 		return
 	}
+
+	isTrial := curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialing ||
+		curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialEnded
+
+	if isTrial {
+		// ****************************************************************************************************************
+		// Update Database immediately as it is trial
+		// ****************************************************************************************************************
+		err = h.db.CancelTrial(r.Context(), businessId)
+		if err != nil {
+			helpers.LogError("CancelHandler", "Local DB, trial cancel update failed", "err", err.Error())
+			helpers.RespondWithError(w, 500, "Internal Server Error")
+			return
+		}
+		helpers.RespondWithJSON(w, http.StatusOK, map[string]string{
+			"message": "Subscription cancelled successfully",
+			"status":  "canceled",
+		})
+		return
+	}
+
 	// Validate: Is there actually a Razorpay Sub ID to cancel?
 	if !curPlan.RazorpaySubscriptionID.Valid || curPlan.RazorpaySubscriptionID.String == "" {
 		helpers.RespondWithError(w, http.StatusBadRequest, "No active recurring subscription to cancel")

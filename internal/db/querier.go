@@ -15,6 +15,7 @@ type Querier interface {
 	AddBusinessMember(ctx context.Context, arg AddBusinessMemberParams) (BusinessMember, error)
 	AddMarketerCommission(ctx context.Context, arg AddMarketerCommissionParams) error
 	CancelSubscription(ctx context.Context, razorpaySubscriptionID string) error
+	CancelTrial(ctx context.Context, id pgtype.UUID) error
 	// returns 1 if a user is admin or creator of a given business_id
 	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
 	// returns 1 if a user is a member of a given business_id

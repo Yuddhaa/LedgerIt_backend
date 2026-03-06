@@ -259,11 +259,15 @@ func ValidatePlan(q planQuerier) func(http.Handler) http.Handler {
 				// }
 				// if curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialing {
 				// }
+				status := db.SubscriptionsStatusPastDue
+				if curPlan.SubscriptionsStatus == db.SubscriptionsStatusTrialing {
+					status = db.SubscriptionsStatusTrialEnded
+				}
 
 				if _, err := q.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
 					ID:                    businessId,
 					CurrentPlanID:         curPlan.CurrentPlanID,
-					SubscriptionsStatus:   db.SubscriptionsStatusPastDue,
+					SubscriptionsStatus:   status,
 					CurrentSubscriptionID: curPlan.SubscriptionID,
 					// leave curPlan.SubscriptionEndPeriod, it will be set to NULL
 				}); err != nil {
