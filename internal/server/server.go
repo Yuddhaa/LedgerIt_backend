@@ -65,7 +65,7 @@ func (s *Server) setupRouter() {
 		"http://localhost:3000",  // optional (web dev)
 		"http://localhost:8000",  // optional (web dev)
 		"http://localhost:5173",  // optional (web dev)
-		"http://localhost",       // Android Capacitor
+		"https://localhost",      // Android Capacitor
 		"capacitor://localhost",  // iOS Capacitor
 		"http://localhost:19006", // Expo dev
 		"https://ledgerit-backend.onrender.com",
