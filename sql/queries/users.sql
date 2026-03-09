@@ -36,4 +36,11 @@ WHERE
     id = $1
 RETURNING *;
 
-
+-- updates is_trial_used
+-- name: UpdateUsersTrialUsed :exec
+UPDATE users
+SET 
+    is_trial_used = $2,
+    updated_at = now()
+WHERE 
+    id = $1;

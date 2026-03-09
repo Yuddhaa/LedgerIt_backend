@@ -12,7 +12,7 @@ import (
 )
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users
+SELECT id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at FROM users
 WHERE email = $1
 `
 
@@ -26,6 +26,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PhoneNumber,
 		&i.GoogleID,
 		&i.Picture,
+		&i.IsTrialUsed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -33,7 +34,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserById = `-- name: GetUserById :one
-SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users
+SELECT id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at FROM users
 WHERE id = $1
 `
 
@@ -47,6 +48,7 @@ func (q *Queries) GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 		&i.PhoneNumber,
 		&i.GoogleID,
 		&i.Picture,
+		&i.IsTrialUsed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -54,7 +56,7 @@ func (q *Queries) GetUserById(ctx context.Context, id pgtype.UUID) (User, error)
 }
 
 const getUserByPhone = `-- name: GetUserByPhone :one
-SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users
+SELECT id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at FROM users
 WHERE phone_number = $1
 `
 
@@ -68,6 +70,7 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (
 		&i.PhoneNumber,
 		&i.GoogleID,
 		&i.Picture,
+		&i.IsTrialUsed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
@@ -75,7 +78,7 @@ func (q *Queries) GetUserByPhone(ctx context.Context, phoneNumber pgtype.Text) (
 }
 
 const listUsers = `-- name: ListUsers :many
-SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users
+SELECT id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at FROM users
 ORDER BY created_at DESC
 `
 
@@ -95,6 +98,7 @@ func (q *Queries) ListUsers(ctx context.Context) ([]User, error) {
 			&i.PhoneNumber,
 			&i.GoogleID,
 			&i.Picture,
+			&i.IsTrialUsed,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 		); err != nil {
@@ -116,7 +120,7 @@ SET
     updated_at = now()
 WHERE 
     id = $1
-RETURNING id, name, email, phone_number, google_id, picture, created_at, updated_at
+RETURNING id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at
 `
 
 type UpdateUserProfileParams struct {
@@ -135,10 +139,31 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.PhoneNumber,
 		&i.GoogleID,
 		&i.Picture,
+		&i.IsTrialUsed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)
 	return i, err
+}
+
+const updateUsersTrialUsed = `-- name: UpdateUsersTrialUsed :exec
+UPDATE users
+SET 
+    is_trial_used = $2,
+    updated_at = now()
+WHERE 
+    id = $1
+`
+
+type UpdateUsersTrialUsedParams struct {
+	ID          pgtype.UUID `json:"id"`
+	IsTrialUsed bool        `json:"is_trial_used"`
+}
+
+// updates is_trial_used
+func (q *Queries) UpdateUsersTrialUsed(ctx context.Context, arg UpdateUsersTrialUsedParams) error {
+	_, err := q.db.Exec(ctx, updateUsersTrialUsed, arg.ID, arg.IsTrialUsed)
+	return err
 }
 
 const upsertUserByEmail = `-- name: UpsertUserByEmail :one
@@ -146,11 +171,11 @@ WITH inserted AS (
   INSERT INTO users (google_id, email, name, picture)
   VALUES ($1, $2, $3, $4)
   ON CONFLICT (email) DO NOTHING
-  RETURNING id, name, email, phone_number, google_id, picture, created_at, updated_at -- Key change 1: Return the *whole user row*, not just the id
+  RETURNING id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at -- Key change 1: Return the *whole user row*, not just the id
 )
-SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM inserted -- Key change 2: Select the new user from the CTE
+SELECT id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at FROM inserted -- Key change 2: Select the new user from the CTE
 UNION
-SELECT id, name, email, phone_number, google_id, picture, created_at, updated_at FROM users WHERE email = $2 -- Select the existing user if the CTE is empty
+SELECT id, name, email, phone_number, google_id, picture, is_trial_used, created_at, updated_at FROM users WHERE email = $2 -- Select the existing user if the CTE is empty
 LIMIT 1
 `
 
@@ -168,6 +193,7 @@ type UpsertUserByEmailRow struct {
 	PhoneNumber pgtype.Text        `json:"phone_number"`
 	GoogleID    string             `json:"google_id"`
 	Picture     pgtype.Text        `json:"picture"`
+	IsTrialUsed bool               `json:"is_trial_used"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
@@ -187,6 +213,7 @@ func (q *Queries) UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailPa
 		&i.PhoneNumber,
 		&i.GoogleID,
 		&i.Picture,
+		&i.IsTrialUsed,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

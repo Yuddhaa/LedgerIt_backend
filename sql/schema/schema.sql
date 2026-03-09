@@ -9,6 +9,7 @@ CREATE TABLE users (
     phone_number TEXT UNIQUE,
     google_id TEXT UNIQUE NOT NULL,
     picture TEXT,
+    is_trial_used BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

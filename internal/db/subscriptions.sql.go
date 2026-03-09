@@ -72,13 +72,13 @@ func (q *Queries) CancelTrial(ctx context.Context, id pgtype.UUID) error {
 
 const checkUserPlanEligibility = `-- name: CheckUserPlanEligibility :one
 SELECT 
-    -- Logic: If count of 'free' plans is 0, then Free IS available.
-    (COUNT(*) FILTER (WHERE current_plan_id = 'permanent-solo-0') = 0)::BOOLEAN AS free_available,
+    -- Logic: If they have 0 'solo' businesses, Free is available.
+    (SELECT COUNT(*) = 0 FROM businesses WHERE owner_id = $1 AND current_plan_id = 'permanent-solo-0') AS free_available,
     
-    -- Logic: If count of businesses that used a trial is 0, then Trial IS available.
-    (COUNT(*) FILTER (WHERE is_trial_used = true) = 0)::BOOLEAN AS trial_available
-FROM businesses
-WHERE owner_id = $1
+    -- Logic: Inverse of the boolean flag in the users table.
+    COALESCE(NOT is_trial_used, false)::boolean AS trial_available
+FROM users
+WHERE id = $1
 `
 
 type CheckUserPlanEligibilityRow struct {
@@ -86,8 +86,6 @@ type CheckUserPlanEligibilityRow struct {
 	TrialAvailable bool `json:"trial_available"`
 }
 
-// CheckUserPlanEligibility checks if the user has free businesses
-// or trial period available
 func (q *Queries) CheckUserPlanEligibility(ctx context.Context, ownerID pgtype.UUID) (CheckUserPlanEligibilityRow, error) {
 	row := q.db.QueryRow(ctx, checkUserPlanEligibility, ownerID)
 	var i CheckUserPlanEligibilityRow

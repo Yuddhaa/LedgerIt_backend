@@ -44,10 +44,10 @@ func (h *Handler) trialHandler(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	planId := fmt.Sprintf("%s-%s-%s", body.Period, body.BasePlan, body.AddOn)
 	if !validateRequestBody(w, body) {
 		return
 	}
+	planId := fmt.Sprintf("%s-%s-%s", body.Period, body.BasePlan, body.AddOn)
 	if planId == configs.FREE_PLAN_ID {
 		helpers.LogInfo("trialHandler", "trial is not allowed for solo", "businessId", businessId)
 		helpers.RespondWithError(w, http.StatusForbidden, "trial is not allowed for "+configs.FREE_PLAN_ID)
@@ -92,10 +92,23 @@ func (h *Handler) trialHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogInfo("trialHandler", "trial not available", "creatorId", userId)
 		return
 	}
+
+	// ****************************************************************************************************************
+	//  Start Transaction
+	// ****************************************************************************************************************
+	tx, err := h.pool.Begin(r.Context())
+	if err != nil {
+		helpers.RespondWithError(w, http.StatusInternalServerError, "internal server error")
+		helpers.LogInfo("trialHandler", "error in starting the pool Transaction", "err", err.Error())
+		return
+	}
+	defer tx.Rollback(r.Context())
+	qtx := h.db.WithTx(tx)
+
 	// ****************************************************************************************************************
 	// if trial available and business doesn't has a plan already, grant the trial
 	// ****************************************************************************************************************
-	business, err := h.db.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
+	business, err := qtx.UpdateBusinessSubscription(r.Context(), db.UpdateBusinessSubscriptionParams{
 		ID:                    businessId,
 		CurrentSubscriptionID: pgtype.UUID{Valid: false},
 		CurrentPlanID:         pgtype.Text{String: planId, Valid: true},
@@ -114,6 +127,28 @@ func (h *Handler) trialHandler(w http.ResponseWriter, r *http.Request) {
 		helpers.LogError("trialHandler", "db error in UpdateBusinessSubscription", "err", err.Error())
 		return
 	}
+
+	// ****************************************************************************************************************
+	// update the users table is_trial_used
+	// ****************************************************************************************************************
+	if err := qtx.UpdateUsersTrialUsed(r.Context(), db.UpdateUsersTrialUsedParams{
+		ID:          userId,
+		IsTrialUsed: true,
+	}); err != nil {
+		helpers.RespondWithError(w, 500, "internal server error")
+		helpers.LogError("trialHandler", "db error in UpdateUsersTrialUsed", "err", err.Error())
+		return
+	}
+
+	// ****************************************************************************************************************
+	// commit
+	// ****************************************************************************************************************
+	if err := tx.Commit(r.Context()); err != nil {
+		helpers.RespondWithError(w, 500, "internal server error")
+		helpers.LogError("trialHandler", "db error while committing", "err", err.Error())
+		return
+	}
+
 	// ****************************************************************************************************************
 	// return the response
 	// ****************************************************************************************************************

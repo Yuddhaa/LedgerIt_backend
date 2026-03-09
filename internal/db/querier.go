@@ -20,8 +20,6 @@ type Querier interface {
 	CheckAdmin(ctx context.Context, arg CheckAdminParams) (int32, error)
 	// returns 1 if a user is a member of a given business_id
 	CheckMember(ctx context.Context, arg CheckMemberParams) (int32, error)
-	// CheckUserPlanEligibility checks if the user has free businesses
-	// or trial period available
 	CheckUserPlanEligibility(ctx context.Context, ownerID pgtype.UUID) (CheckUserPlanEligibilityRow, error)
 	CreateBusinessAndAddOwner(ctx context.Context, arg CreateBusinessAndAddOwnerParams) (Business, error)
 	// add a new category
@@ -132,6 +130,8 @@ type Querier interface {
 	UpdateSubscriptionStatusRaw(ctx context.Context, arg UpdateSubscriptionStatusRawParams) error
 	UpdateTransaction(ctx context.Context, arg UpdateTransactionParams) (Transaction, error)
 	UpdateUserProfile(ctx context.Context, arg UpdateUserProfileParams) (User, error)
+	// updates is_trial_used
+	UpdateUsersTrialUsed(ctx context.Context, arg UpdateUsersTrialUsedParams) error
 	UpsertUserByEmail(ctx context.Context, arg UpsertUserByEmailParams) (UpsertUserByEmailRow, error)
 	VerifyCategoryBelongsToBusiness(ctx context.Context, arg VerifyCategoryBelongsToBusinessParams) (bool, error)
 	VerifyPartyBelongsToBusiness(ctx context.Context, arg VerifyPartyBelongsToBusinessParams) (bool, error)

@@ -612,6 +612,7 @@ type User struct {
 	PhoneNumber pgtype.Text        `json:"phone_number"`
 	GoogleID    string             `json:"google_id"`
 	Picture     pgtype.Text        `json:"picture"`
+	IsTrialUsed bool               `json:"is_trial_used"`
 	CreatedAt   pgtype.Timestamptz `json:"created_at"`
 	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
 }
