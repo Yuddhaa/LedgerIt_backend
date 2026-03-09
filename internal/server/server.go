@@ -61,18 +61,22 @@ func (s *Server) setupRouter() {
 
 	r.Use(middleware.Recoverer) // Recovers from panics
 
+	AllowedOrigins := []string{
+		"http://localhost:3000",  // optional (web dev)
+		"http://localhost:8000",  // optional (web dev)
+		"http://localhost:5173",  // optional (web dev)
+		"http://localhost",       // Android Capacitor
+		"capacitor://localhost",  // iOS Capacitor
+		"http://localhost:19006", // Expo dev
+		"https://ledgerit-backend.onrender.com",
+		"https://churchly-phebe-inconstantly.ngrok-free.dev",
+	}
+	if configs.Configs.MODE == "DEV" {
+		AllowedOrigins = append(AllowedOrigins, "*")
+	}
 	// Apply CORS globally to all handlers
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins: []string{
-			"http://localhost:3000",  // optional (web dev)
-			"http://localhost:8000",  // optional (web dev)
-			"http://localhost:5173",  // optional (web dev)
-			"http://localhost",       // Android Capacitor
-			"capacitor://localhost",  // iOS Capacitor
-			"http://localhost:19006", // Expo dev
-			"https://ledgerit-backend.onrender.com",
-			"https://churchly-phebe-inconstantly.ngrok-free.dev",
-		},
+		AllowedOrigins:   AllowedOrigins,
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		ExposedHeaders:   []string{"Authorization"},
