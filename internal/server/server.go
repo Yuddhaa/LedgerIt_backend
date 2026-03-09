@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"time"
 
 	"LedgerIt/internal/admin"
@@ -71,12 +72,18 @@ func (s *Server) setupRouter() {
 		"https://ledgerit-backend.onrender.com",
 		"https://churchly-phebe-inconstantly.ngrok-free.dev",
 	}
-	if configs.Configs.MODE == "DEV" {
-		AllowedOrigins = append(AllowedOrigins, "*")
-	}
 	// Apply CORS globally to all handlers
 	r.Use(cors.Handler(cors.Options{
-		AllowedOrigins:   AllowedOrigins,
+		AllowOriginFunc: func(_ *http.Request, origin string) bool {
+			// 1. In DEV, allow everything (including your Mac's IP)
+			// while still supporting AllowCredentials: true
+			if configs.Configs.MODE == "DEV" {
+				return true
+			}
+
+			// 2. In PROD, match against your strict list
+			return slices.Contains(AllowedOrigins, origin)
+		},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
 		ExposedHeaders:   []string{"Authorization"},
