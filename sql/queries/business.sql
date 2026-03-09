@@ -39,9 +39,9 @@ WHERE bm.user_id = $1 and b.id = $2;
 -- Retrieves all businesses a user is a member of, including their role and balance in each.
 -- name: GetBusinessesByUserID :many
 SELECT 
-    b.*
-    -- bm.role, 
-    -- bm.current_balance
+    b.*,
+    bm.role, 
+    bm.current_balance
 FROM 
     businesses b
 JOIN 

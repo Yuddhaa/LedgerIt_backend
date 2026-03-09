@@ -64,7 +64,7 @@ type Querier interface {
 	// Retrieves all businesses owned by a specific user ID.
 	GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUID) ([]Business, error)
 	// Retrieves all businesses a user is a member of, including their role and balance in each.
-	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error)
+	GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]GetBusinessesByUserIDRow, error)
 	// get a particular category
 	GetCategory(ctx context.Context, arg GetCategoryParams) (TransactionCategory, error)
 	GetMarketerById(ctx context.Context, id pgtype.UUID) (Marketer, error)

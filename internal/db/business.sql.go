@@ -283,9 +283,9 @@ func (q *Queries) GetBusinessesByOwnerID(ctx context.Context, ownerID pgtype.UUI
 
 const getBusinessesByUserID = `-- name: GetBusinessesByUserID :many
 SELECT 
-    b.id, b.name, b.owner_id, b.created_at, b.updated_at, b.current_plan_id, b.subscriptions_status, b.subscription_end_period, b.is_trial_used, b.current_subscription_id, b.is_offer_used, b.offer_code
-    -- bm.role, 
-    -- bm.current_balance
+    b.id, b.name, b.owner_id, b.created_at, b.updated_at, b.current_plan_id, b.subscriptions_status, b.subscription_end_period, b.is_trial_used, b.current_subscription_id, b.is_offer_used, b.offer_code,
+    bm.role, 
+    bm.current_balance
 FROM 
     businesses b
 JOIN 
@@ -294,16 +294,33 @@ WHERE
     bm.user_id = $1
 `
 
+type GetBusinessesByUserIDRow struct {
+	ID                    pgtype.UUID         `json:"id"`
+	Name                  string              `json:"name"`
+	OwnerID               pgtype.UUID         `json:"owner_id"`
+	CreatedAt             pgtype.Timestamptz  `json:"created_at"`
+	UpdatedAt             pgtype.Timestamptz  `json:"updated_at"`
+	CurrentPlanID         pgtype.Text         `json:"current_plan_id"`
+	SubscriptionsStatus   SubscriptionsStatus `json:"subscriptions_status"`
+	SubscriptionEndPeriod pgtype.Timestamptz  `json:"subscription_end_period"`
+	IsTrialUsed           bool                `json:"is_trial_used"`
+	CurrentSubscriptionID pgtype.UUID         `json:"current_subscription_id"`
+	IsOfferUsed           bool                `json:"is_offer_used"`
+	OfferCode             pgtype.Text         `json:"offer_code"`
+	Role                  BusinessRole        `json:"role"`
+	CurrentBalance        pgtype.Numeric      `json:"current_balance"`
+}
+
 // Retrieves all businesses a user is a member of, including their role and balance in each.
-func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]Business, error) {
+func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID) ([]GetBusinessesByUserIDRow, error) {
 	rows, err := q.db.Query(ctx, getBusinessesByUserID, userID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Business{}
+	items := []GetBusinessesByUserIDRow{}
 	for rows.Next() {
-		var i Business
+		var i GetBusinessesByUserIDRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
@@ -317,6 +334,8 @@ func (q *Queries) GetBusinessesByUserID(ctx context.Context, userID pgtype.UUID)
 			&i.CurrentSubscriptionID,
 			&i.IsOfferUsed,
 			&i.OfferCode,
+			&i.Role,
+			&i.CurrentBalance,
 		); err != nil {
 			return nil, err
 		}
