@@ -40,6 +40,6 @@ func (h *Handler) GetPartyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	res := resType{Parties: parties}
-	helpers.LogInfo("GetPartyHandler", "all parties sent", "res", res, "count", len(res.Parties), "businessId", businessId, "place", place)
+	helpers.LogInfo("GetPartyHandler", "all parties sent", "count", len(res.Parties), "businessId", businessId, "place", place)
 	helpers.RespondWithJSON(w, 200, res)
 }

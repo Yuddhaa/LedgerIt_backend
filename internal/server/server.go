@@ -1,7 +1,6 @@
 package server
 
 import (
-	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -84,8 +83,8 @@ func (s *Server) setupRouter() {
 			// 2. In PROD, match against your strict list
 			return slices.Contains(AllowedOrigins, origin)
 		},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization"},
+		AllowedMethods:   []string{"GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"},
+		AllowedHeaders:   []string{"Accept", "Content-Type", "Authorization", "ngrok-skip-browser-warning"},
 		ExposedHeaders:   []string{"Authorization"},
 		AllowCredentials: true,
 		MaxAge:           300,
@@ -120,37 +119,13 @@ func (s *Server) setupRouter() {
 
 	// --- Public Routes ---
 	r.Get("/health", func(w http.ResponseWriter, r *http.Request) {
-		// 1. Check Database Connection
-		// This sends a lightweight "Ping" packet to Postgres.
-		// It waits for a response or times out quickly.
-		ctx, cancel := context.WithTimeout(r.Context(), 2*time.Second)
-		defer cancel()
-
-		err := s.pool.Ping(ctx) // Assuming 'h.pool' is your *pgxpool.Pool
-
-		status := "active"
-		dbStatus := "connected"
-		httpCode := http.StatusOK
-
-		if err != nil {
-			// If DB is down, we should technically return 500 so Render knows
-			// the app is "unhealthy" and shouldn't receive traffic.
-			status = "unhealthy"
-			dbStatus = "disconnected"
-			httpCode = http.StatusServiceUnavailable // 503
-
-			// Optional: Log the error so you know WHY it's failing
-			helpers.LogError("HealthCheck", "Database ping failed", "err", err.Error())
-		}
-
 		response := map[string]string{
-			"status":    status,
-			"database":  dbStatus,
+			"status":    "OK",
 			"timestamp": time.Now().Format(time.RFC3339),
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(httpCode)
+		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(response)
 	})
 

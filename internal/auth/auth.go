@@ -189,7 +189,7 @@ func GetRole(q roleQuerier) func(http.Handler) http.Handler {
 			})
 			if err != nil {
 				if errors.Is(err, pgx.ErrNoRows) {
-					helpers.RespondWithError(w, http.StatusUnauthorized, "no user found")
+					helpers.RespondWithError(w, http.StatusUnauthorized, "Not a member of the business")
 					helpers.LogInfo("GetRole", "no user found", "userId", userId, "businessId", businessId)
 					roleInt = 0
 					return
