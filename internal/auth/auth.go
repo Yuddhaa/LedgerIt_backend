@@ -59,6 +59,7 @@ func (h *Handler) Routes() chi.Router {
 	// --- Public Auth Routes ---
 	// These routes do NOT have the JWT middleware
 	r.Post("/google/signin", h.GoogleAuthHandler)
+	r.Post("/test/signin", h.TestSignin)
 	r.Post("/refresh", h.RefreshHandler)
 
 	// --- Protected Auth Routes ---
